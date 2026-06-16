@@ -362,12 +362,12 @@ function render() {
   $('#muteBtn').textContent = settings.announce ? '🔊' : '🔇';
 }
 
-function flash(msg) {
+function flash(msg, dur) {
   const el = $('#feedback');
   el.textContent = msg;
   el.classList.add('show');
   clearTimeout(flash._t);
-  flash._t = setTimeout(() => el.classList.remove('show'), 1100);
+  flash._t = setTimeout(() => el.classList.remove('show'), dur || 1100);
 }
 
 function show(id) { $('#' + id).classList.remove('hidden'); }
@@ -627,14 +627,20 @@ $('#repeatBtn').addEventListener('click', () => { ensureAudio(); announce(undefi
 
 // Vollbild ein/aus (versteckt die Browser-Leisten; auf Android-Chrome zuverlässig)
 function toggleFullscreen() {
+  const el = document.documentElement;
+  const enter = el.requestFullscreen || el.webkitRequestFullscreen;
+  // iPhone/iOS-Safari unterstützt kein Web-Vollbild -> Hinweis geben
+  if (!enter) {
+    flash('iPhone: Teilen-Symbol → „Zum Home-Bildschirm", dann von dort öffnen', 4500);
+    return;
+  }
   try {
-    const el = document.documentElement;
     if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-      (el.requestFullscreen || el.webkitRequestFullscreen || (() => {})).call(el);
+      enter.call(el);
     } else {
       (document.exitFullscreen || document.webkitExitFullscreen || (() => {})).call(document);
     }
-  } catch (e) { /* z.B. iOS Safari unterstützt das nicht */ }
+  } catch (e) {}
 }
 $('#fsBtn').addEventListener('click', toggleFullscreen);
 document.addEventListener('fullscreenchange', () => {
