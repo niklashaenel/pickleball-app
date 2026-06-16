@@ -624,6 +624,23 @@ let drag = null;
 $('#undoBtn').addEventListener('click', undo);
 $('#menuBtn').addEventListener('click', openSettings);
 $('#repeatBtn').addEventListener('click', () => { ensureAudio(); announce(undefined, true); });
+
+// Vollbild ein/aus (versteckt die Browser-Leisten; auf Android-Chrome zuverlässig)
+function toggleFullscreen() {
+  try {
+    const el = document.documentElement;
+    if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+      (el.requestFullscreen || el.webkitRequestFullscreen || (() => {})).call(el);
+    } else {
+      (document.exitFullscreen || document.webkitExitFullscreen || (() => {})).call(document);
+    }
+  } catch (e) { /* z.B. iOS Safari unterstützt das nicht */ }
+}
+$('#fsBtn').addEventListener('click', toggleFullscreen);
+document.addEventListener('fullscreenchange', () => {
+  const fs = !!document.fullscreenElement;
+  $('#fsBtn').title = fs ? 'Vollbild beenden' : 'Vollbild';
+});
 $('#muteBtn').addEventListener('click', () => {
   settings.announce = !settings.announce;
   saveSettings();

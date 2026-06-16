@@ -4,7 +4,7 @@
   "description": "Punktezähler für Pickleball mit Sprachansage und Klicker-Steuerung",
   "start_url": ".",
   "scope": ".",
-  "display": "standalone",
+  "display": "fullscreen",
   "orientation": "landscape",
   "background_color": "#0f172a",
   "theme_color": "#0f172a",
