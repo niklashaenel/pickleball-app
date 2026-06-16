@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Klicker-Test</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 1rem; padding: 1.2rem;
+      font-family: system-ui, sans-serif;
+      background: #0f172a; color: #e2e8f0; text-align: center;
+    }
+    h1 { font-size: 1.3rem; margin: 0; }
+    p  { margin: 0; color: #94a3b8; max-width: 38rem; }
+    #big {
+      font-size: clamp(3rem, 18vw, 9rem); font-weight: 800; line-height: 1;
+      color: #facc15; word-break: break-all;
+    }
+    #detail { font-size: 1.1rem; color: #cbd5e1; }
+    #detail span { color: #fff; font-weight: 700; }
+    #log {
+      width: 100%; max-width: 38rem; text-align: left;
+      background: #1e293b; border-radius: .6rem; padding: .6rem .9rem;
+      font-family: ui-monospace, monospace; font-size: .9rem;
+      max-height: 32vh; overflow: auto;
+    }
+    #log div { padding: .15rem 0; border-bottom: 1px solid #334155; }
+    .hint { font-size: .85rem; color: #64748b; }
+    a { color: #38bdf8; }
+  </style>
+</head>
+<body>
+  <h1>🎾 Klicker-Test</h1>
+  <p>Koppel deinen Bluetooth-Klicker mit diesem Gerät und drück die Knöpfe.
+     Wenn unten etwas erscheint, <strong>kommt der Tastendruck an</strong> – super!
+     Notier dir, was bei <em>code</em> steht.</p>
+
+  <div id="big">– –</div>
+  <div id="detail">Noch keine Taste gedrückt</div>
+
+  <div id="log"></div>
+
+  <p class="hint">Tipp: Falls nichts passiert, hat der Klicker evtl. einen Umschalter
+     (iOS/Android oder Kamera/Musik). Probier die andere Stellung.</p>
+  <p class="hint"><a href="index.html">← zur Punktezähler-App</a></p>
+
+  <script>
+    const big = document.getElementById('big');
+    const detail = document.getElementById('detail');
+    const log = document.getElementById('log');
+    let count = 0;
+
+    function show(e) {
+      e.preventDefault();
+      count++;
+      const key = e.key === ' ' ? 'Leertaste' : e.key;
+      big.textContent = key && key.length ? key : '(?)';
+      detail.innerHTML =
+        'key: <span>' + (e.key || '?') + '</span> &nbsp; ' +
+        'code: <span>' + (e.code || '?') + '</span> &nbsp; ' +
+        'keyCode: <span>' + (e.keyCode || '?') + '</span>';
+      const row = document.createElement('div');
+      row.textContent = '#' + count + '  key="' + e.key + '"  code="' + e.code + '"  keyCode=' + e.keyCode;
+      log.prepend(row);
+    }
+
+    // keydown fängt die meisten Klicker; keyup als Reserve
+    window.addEventListener('keydown', show);
+  </script>
+</body>
+</html>
