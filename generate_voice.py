@@ -14,7 +14,7 @@ import os
 import edge_tts
 
 VOICE = "de-DE-ConradNeural"
-MAX = 15  # Voll-Rufe fuer Staende 0..MAX
+MAX = 21  # Voll-Rufe fuer Staende 0..MAX
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "voice")
 os.makedirs(OUT, exist_ok=True)
 
@@ -41,6 +41,8 @@ clips.update({
     "gewinnt-das-match": "gewinnt das Match",
     "team-a": "Team A",
     "team-b": "Team B",
+    "so_a": "Seitenwechsel, Aufschlag Team A",
+    "so_b": "Seitenwechsel, Aufschlag Team B",
 })
 
 # Volle Spielstand-Rufe (ein Stück = natuerliche Betonung)

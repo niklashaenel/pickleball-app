@@ -664,18 +664,19 @@ function buildClipKeys(event) {
 function buildPhraseKeys(event) {
   if (game.over) return null;            // Spielende über Wort-Fallback (selten)
   const nums = callText();
-  if (nums[0] > 15 || nums[1] > 15) return null; // außerhalb des erzeugten Bereichs
+  if (nums[0] > 21 || nums[1] > 21) return null; // außerhalb des erzeugten Bereichs
   const call = settings.mode === 'doubles'
     ? 'd_' + nums[0] + '_' + nums[1] + '_' + nums[2]
     : 's_' + nums[0] + '_' + nums[1];
   const keys = [];
   if (event === 'sideout') {
-    keys.push('seitenwechsel');
     if (settings.announceTeam) {
       const nm = teamName(game.serving);
-      if (nm === 'Team A') keys.push('aufschlag', 'team-a');
-      else if (nm === 'Team B') keys.push('aufschlag', 'team-b');
+      if (nm === 'Team A') keys.push('so_a');       // "Seitenwechsel, Aufschlag Team A" am Stück
+      else if (nm === 'Team B') keys.push('so_b');
       else return null;                  // eigener Name -> Wort-Fallback/Stimme
+    } else {
+      keys.push('seitenwechsel');
     }
   }
   keys.push(call);                       // <- der natürliche Voll-Ruf
