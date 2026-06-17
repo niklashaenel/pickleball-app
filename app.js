@@ -418,8 +418,8 @@ function announce(event, force) {
     }
   }
   stopVoice();
-  // Natürliche Schnipsel verwenden, wenn aktiviert und vollständig vorhanden
-  if (settings.naturalVoice && clipsAvailable) {
+  // Natürliche Schnipsel verwenden, wenn aktiviert, vorhanden und Web Audio bereit
+  if (settings.naturalVoice && clipsAvailable && ensureAudio()) {
     const keys = buildClipKeys(event);
     if (keys) { playClips(keys); return; }
   }
@@ -544,8 +544,10 @@ const CLIP_KEYS = new Set([
   'spiel-fuer', 'satzstand', 'match', 'gewinnt-das-match', 'team-a', 'team-b'
 ]);
 let clipsAvailable = false;
-let clipAudio = null;
+let clipsPreloaded = false;
 let clipGen = 0;
+let clipNodes = [];
+const clipBuffers = {};
 
 function probeClips() {
   const p = new Audio();
@@ -554,27 +556,69 @@ function probeClips() {
   p.src = 'voice/0.mp3';
 }
 
+// Schnipsel laden und als AudioBuffer dekodieren (für lückenloses Abspielen)
+// Stille am Anfang/Ende eines Schnipsels finden, damit Wörter dicht aneinander liegen
+function trimEntry(buf) {
+  const data = buf.getChannelData(0);
+  const n = data.length, thresh = 0.015;
+  let s = 0, e = n - 1;
+  while (s < n && Math.abs(data[s]) < thresh) s++;
+  while (e > s && Math.abs(data[e]) < thresh) e--;
+  const pad = Math.floor(buf.sampleRate * 0.03);
+  s = Math.max(0, s - pad);
+  e = Math.min(n - 1, e + pad);
+  return { buf: buf, offset: s / buf.sampleRate, dur: Math.max(0.05, (e - s) / buf.sampleRate) };
+}
+async function loadClip(key) {
+  if (clipBuffers[key]) return clipBuffers[key];
+  const ctx = ensureAudio();
+  if (!ctx) return null;
+  try {
+    const arr = await (await fetch('voice/' + key + '.mp3')).arrayBuffer();
+    const buf = await ctx.decodeAudioData(arr);
+    const entry = trimEntry(buf);
+    clipBuffers[key] = entry;
+    return entry;
+  } catch (e) { return null; }
+}
+function preloadClips() {
+  if (clipsPreloaded) return;
+  clipsPreloaded = true;
+  CLIP_KEYS.forEach((k) => { loadClip(k); });
+}
+
+function stopClipNodes() {
+  clipNodes.forEach((n) => { try { n.stop(); } catch (e) {} });
+  clipNodes = [];
+}
 // Aktuelle Ansage (Schnipsel oder Sprache) stoppen
 function stopVoice() {
   clipGen++;
-  if (clipAudio) { try { clipAudio.pause(); } catch (e) {} }
+  stopClipNodes();
   if ('speechSynthesis' in window) { try { speechSynthesis.cancel(); } catch (e) {} }
 }
 
-// Schnipsel nacheinander abspielen (ein wiederverwendetes Audio-Element -> iOS-sicher)
-function playClips(keys) {
-  const a = clipAudio || (clipAudio = new Audio());
+// Schnipsel lückenlos nacheinander planen (Web Audio)
+async function playClips(keys) {
+  const ctx = ensureAudio();
+  if (!ctx) return;
   const myGen = ++clipGen;
-  let i = 0;
-  const next = () => {
-    if (myGen !== clipGen || i >= keys.length) return;
-    a.src = 'voice/' + keys[i] + '.mp3';
-    const p = a.play();
-    if (p && p.catch) p.catch(() => { i++; next(); });
-  };
-  a.onended = () => { i++; next(); };
-  a.onerror = () => { i++; next(); };
-  next();
+  const entries = [];
+  for (const k of keys) {
+    const en = await loadClip(k);
+    if (myGen !== clipGen) return; // unterbrochen
+    entries.push(en);
+  }
+  let t = ctx.currentTime + 0.04;
+  for (const en of entries) {
+    if (!en) continue;
+    const src = ctx.createBufferSource();
+    src.buffer = en.buf;
+    src.connect(ctx.destination);
+    src.start(t, en.offset, en.dur); // nur den gesprochenen Teil
+    clipNodes.push(src);
+    t += en.dur + 0.05; // kleine natürliche Pause zwischen den Wörtern
+  }
 }
 
 // Schnipsel-Schlüssel für die aktuelle Ansage; null, wenn nicht alles als Schnipsel da ist
@@ -851,6 +895,7 @@ document.addEventListener('visibilitychange', () => {
 function primeSpeech() {
   requestWakeLock();
   ensureAudio();
+  preloadClips();
   if ('speechSynthesis' in window) {
     try { speechSynthesis.getVoices(); } catch (e) {}
   }
