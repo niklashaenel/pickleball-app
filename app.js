@@ -560,14 +560,14 @@ function probeClips() {
 // Stille am Anfang/Ende eines Schnipsels finden, damit Wörter dicht aneinander liegen
 function trimEntry(buf) {
   const data = buf.getChannelData(0);
-  const n = data.length, thresh = 0.015;
+  const n = data.length, thresh = 0.012;
   let s = 0, e = n - 1;
   while (s < n && Math.abs(data[s]) < thresh) s++;
   while (e > s && Math.abs(data[e]) < thresh) e--;
-  const pad = Math.floor(buf.sampleRate * 0.03);
-  s = Math.max(0, s - pad);
-  e = Math.min(n - 1, e + pad);
-  return { buf: buf, offset: s / buf.sampleRate, dur: Math.max(0.05, (e - s) / buf.sampleRate) };
+  const sr = buf.sampleRate;
+  s = Math.max(0, s - Math.floor(sr * 0.04));   // etwas Vorlauf
+  e = Math.min(n - 1, e + Math.floor(sr * 0.12)); // mehr Nachklang, damit nichts abgehackt klingt
+  return { buf: buf, offset: s / sr, dur: Math.max(0.05, (e - s) / sr) };
 }
 async function loadClip(key) {
   if (clipBuffers[key]) return clipBuffers[key];
@@ -610,15 +610,19 @@ async function playClips(keys) {
     entries.push(en);
   }
   let t = ctx.currentTime + 0.04;
-  for (const en of entries) {
-    if (!en) continue;
+  const GAP = 0.22; // natürliche Pause zwischen den Wörtern (~Viertelsekunde)
+  entries.forEach((en, idx) => {
+    if (!en) return;
+    const isLast = idx === entries.length - 1;
+    // letztes Wort länger ausklingen lassen, damit es nicht abgehackt klingt
+    const dur = isLast ? Math.min(en.buf.duration - en.offset, en.dur + 0.25) : en.dur;
     const src = ctx.createBufferSource();
     src.buffer = en.buf;
     src.connect(ctx.destination);
-    src.start(t, en.offset, en.dur); // nur den gesprochenen Teil
+    src.start(t, en.offset, dur);
     clipNodes.push(src);
-    t += en.dur + 0.05; // kleine natürliche Pause zwischen den Wörtern
-  }
+    t += dur + GAP;
+  });
 }
 
 // Schnipsel-Schlüssel für die aktuelle Ansage; null, wenn nicht alles als Schnipsel da ist

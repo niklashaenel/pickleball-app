@@ -1,5 +1,5 @@
 // Service Worker: macht die App nach dem ersten Laden offline nutzbar.
-const CACHE = 'pickleball-v6';
+const CACHE = 'pickleball-v7';
 const VOICE = [
   'zu', 'seitenwechsel', 'verlaengerung', 'es-geht-bis', 'aufschlag', 'spiel', 'gewinnt',
   'spiel-fuer', 'satzstand', 'match', 'gewinnt-das-match', 'team-a', 'team-b'
