@@ -22,6 +22,7 @@ const DEFAULT_SETTINGS = {
   announceTeam: true,
   voiceURI: '',
   sound: true,
+  naturalVoice: true,   // vorab erzeugte natürliche Audio-Schnipsel verwenden, wenn vorhanden
   matchBestOf: 1,   // 1 = Einzelspiel, 3 = Best of 3, 5 = Best of 5
   startServer: 'A', // welches Team zuerst aufschlägt
   showStartChooser: true, // Aufschlag-Auswahl beim Spielstart zeigen
@@ -388,7 +389,7 @@ function scorePhrase() {
 }
 
 function announce(event, force) {
-  if ((!settings.announce && !force) || !('speechSynthesis' in window)) return;
+  if (!settings.announce && !force) return;
   const phrases = [];
   if (game.over) {
     const wName = speakName(teamName(game.winner));
@@ -416,14 +417,19 @@ function announce(event, force) {
       phrases.push('Verlängerung, es geht bis ' + say(a + 2));
     }
   }
-  // Phrasen mit Komma verbinden -> fließender Satz mit weichen Pausen;
-  // Punkt am Ende verhindert, dass das letzte Wort abgeschnitten wird.
+  stopVoice();
+  // Natürliche Schnipsel verwenden, wenn aktiviert und vollständig vorhanden
+  if (settings.naturalVoice && clipsAvailable) {
+    const keys = buildClipKeys(event);
+    if (keys) { playClips(keys); return; }
+  }
+  // sonst Geräte-Stimme (fließender Komma-Satz; Punkt am Ende gegen Abschneiden)
+  if (!('speechSynthesis' in window)) return;
   const text = phrases.join(', ') + '.';
   try {
-    speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.lang = 'de-DE';
-    u.rate = 0.9;   // flüssig, aber nicht gehetzt
+    u.rate = 0.9;
     u.pitch = 1;
     const v = pickVoice();
     if (v) u.voice = v;
@@ -529,6 +535,82 @@ function winJingle() {
   beep(660, 130, 'triangle', 0);
   beep(880, 130, 'triangle', 0.14);
   beep(1175, 220, 'triangle', 0.28);
+}
+
+// ---- Natürliche Audio-Schnipsel (vorab mit edge-tts erzeugt) ----
+const CLIP_KEYS = new Set([
+  ...Array.from({ length: 31 }, (_, i) => String(i)),
+  'zu', 'seitenwechsel', 'verlaengerung', 'es-geht-bis', 'aufschlag', 'spiel', 'gewinnt',
+  'spiel-fuer', 'satzstand', 'match', 'gewinnt-das-match', 'team-a', 'team-b'
+]);
+let clipsAvailable = false;
+let clipAudio = null;
+let clipGen = 0;
+
+function probeClips() {
+  const p = new Audio();
+  p.addEventListener('loadeddata', () => { clipsAvailable = true; }, { once: true });
+  p.addEventListener('error', () => { clipsAvailable = false; }, { once: true });
+  p.src = 'voice/0.mp3';
+}
+
+// Aktuelle Ansage (Schnipsel oder Sprache) stoppen
+function stopVoice() {
+  clipGen++;
+  if (clipAudio) { try { clipAudio.pause(); } catch (e) {} }
+  if ('speechSynthesis' in window) { try { speechSynthesis.cancel(); } catch (e) {} }
+}
+
+// Schnipsel nacheinander abspielen (ein wiederverwendetes Audio-Element -> iOS-sicher)
+function playClips(keys) {
+  const a = clipAudio || (clipAudio = new Audio());
+  const myGen = ++clipGen;
+  let i = 0;
+  const next = () => {
+    if (myGen !== clipGen || i >= keys.length) return;
+    a.src = 'voice/' + keys[i] + '.mp3';
+    const p = a.play();
+    if (p && p.catch) p.catch(() => { i++; next(); });
+  };
+  a.onended = () => { i++; next(); };
+  a.onerror = () => { i++; next(); };
+  next();
+}
+
+// Schnipsel-Schlüssel für die aktuelle Ansage; null, wenn nicht alles als Schnipsel da ist
+function buildClipKeys(event) {
+  const keys = [];
+  let bad = false;
+  const num = (n) => { if (n >= 0 && n <= 30) keys.push(String(n)); else bad = true; };
+  const team = (t) => {
+    const nm = teamName(t);
+    if (nm === 'Team A') keys.push('team-a');
+    else if (nm === 'Team B') keys.push('team-b');
+    else bad = true; // eigener Name -> Geräte-Stimme
+  };
+  if (game.over) {
+    if (settings.matchBestOf > 1 && match[game.winner] >= gamesNeeded()) {
+      keys.push('match'); team(game.winner); keys.push('gewinnt-das-match');
+    } else if (settings.matchBestOf > 1) {
+      keys.push('spiel-fuer'); team(game.winner); keys.push('satzstand'); num(match.A); keys.push('zu'); num(match.B);
+    } else {
+      keys.push('spiel'); team(game.winner); keys.push('gewinnt');
+    }
+  } else {
+    if (event === 'sideout') {
+      keys.push('seitenwechsel');
+      if (settings.announceTeam) { keys.push('aufschlag'); team(game.serving); }
+    }
+    const nums = callText();
+    num(nums[0]); keys.push('zu'); num(nums[1]);
+    if (settings.mode === 'doubles') num(nums[2]);
+    const a = game.scores.A, b = game.scores.B;
+    if (event === 'point' && settings.winBy2 && a === b && a >= settings.target - 1) {
+      keys.push('verlaengerung'); keys.push('es-geht-bis'); num(a + 2);
+    }
+  }
+  if (bad || !keys.every((k) => CLIP_KEYS.has(k))) return null;
+  return keys;
 }
 
 /* =========================================================================
@@ -688,6 +770,7 @@ function openSettings() {
   $('#setStartChooser').checked = settings.showStartChooser;
   $('#setAnnounce').checked = settings.announce;
   $('#setSound').checked = settings.sound;
+  $('#setNaturalVoice').checked = settings.naturalVoice;
   $('#setAnnounceTeam').checked = settings.announceTeam;
   populateVoices();
   $('#setSwap').checked = settings.swapSides;
@@ -718,6 +801,7 @@ $('#historyBtn').addEventListener('click', () => { renderHistory(); document.que
 $('#historyClear').addEventListener('click', () => { localStorage.removeItem(KEY_HISTORY); renderHistory(); });
 $('#historyClose').addEventListener('click', () => { document.querySelector('#historyDlg').close(); });
 $('#setSound').addEventListener('change', (e) => { settings.sound = e.target.checked; saveSettings(); if (settings.sound) soundFor('point'); });
+$('#setNaturalVoice').addEventListener('change', (e) => { settings.naturalVoice = e.target.checked; saveSettings(); });
 $('#setAnnounce').addEventListener('change', (e) => { settings.announce = e.target.checked; saveSettings(); render(); });
 $('#setAnnounceTeam').addEventListener('change', (e) => { settings.announceTeam = e.target.checked; saveSettings(); });
 $('#setVoice').addEventListener('change', (e) => { settings.voiceURI = e.target.value; saveSettings(); speakSample(); });
@@ -790,6 +874,7 @@ function init() {
   if (!localStorage.getItem('pb-intro-seen')) show('intro');
   updateKeyLabels();
   populateVoices();
+  probeClips();
   render();
 }
 init();

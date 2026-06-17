@@ -60,6 +60,20 @@ Bevor du dich auf einen Knopf verlässt, prüfe, ob seine Tasten beim Handy anko
 
 ---
 
+## Natürliche Stimme (Audio-Schnipsel)
+
+Der Spielstand wird mit **vorab erzeugten, natürlichen Audio-Schnipseln** angesagt
+(männliche Stimme „Conrad") — klingt menschlicher und läuft **offline**, in **jedem**
+Browser (auch iOS Safari). Einstellung: **⚙︎ → „Natürliche Stimme (Audio)"** (Standard an).
+- Zahlen und feste Wörter (auch „Team A"/„Team B") kommen aus den Schnipseln.
+- **Eigene** Team-Namen sagt die Geräte-Stimme (siehe unten) — wer das vermeiden will,
+  bleibt einfach bei „Team A" / „Team B".
+- Sind keine Schnipsel vorhanden, nutzt die App automatisch die Geräte-Stimme.
+
+Die Schnipsel liegen im Ordner `voice/`. Neu erzeugen oder Stimme ändern:
+`pip install edge-tts`, dann `python generate_voice.py` (Stimme in der Datei anpassbar,
+z. B. `de-DE-KatjaNeural` für eine weibliche Stimme).
+
 ## Stimme der Ansage verbessern
 
 Die Vorlese-Stimme kommt vom Gerät selbst. In den **Einstellungen → Stimme** kannst du
