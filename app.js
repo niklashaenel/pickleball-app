@@ -225,7 +225,10 @@ function coinToss() {
   applyStartServer();
   render();
   flash('Aufschlag: ' + teamName(settings.startServer));
-  if (settings.announce) speakText('Aufschlag ' + speakName(teamName(settings.startServer)));
+  if (settings.announce) {
+    const tk = teamClipKey(settings.startServer);
+    speakKeysOrText(tk ? ['aufschlag', tk] : null, 'Aufschlag ' + speakName(teamName(settings.startServer)));
+  }
 }
 
 // Verlauf-Liste füllen
@@ -386,6 +389,18 @@ function scorePhrase() {
     return say(nums[0]) + ' zu ' + say(nums[1]) + ', ' + say(nums[2]);
   }
   return say(nums[0]) + ' zu ' + say(nums[1]);
+}
+
+// Schnipsel-Folge abspielen; klappt das nicht, Text per Geräte-Stimme
+async function speakKeysOrText(keys, fallbackText) {
+  stopVoice();
+  const myGen = clipGen;
+  if (keys && settings.naturalVoice && clipsAvailable && ensureAudio()) {
+    const entries = await Promise.all(keys.map((k) => loadClip(k)));
+    if (myGen !== clipGen) return;
+    if (entries.every(Boolean)) { playEntries(entries); return; }
+  }
+  speakText(fallbackText);
 }
 
 async function announce(event, force) {
@@ -727,7 +742,7 @@ function buildPhraseKeys(event) {
 // Spieler-Auswahl pro Team (Spieler 1 / Spieler 2)
 function fillPlayerSelect(sel, firstLabel, firstValue) {
   if (!sel) return;
-  const ps = CLUB_PLAYERS.slice().sort((a, b) => slug(a).localeCompare(slug(b)));
+  const ps = CLUB_PLAYERS.slice().sort((a, b) => a.localeCompare(b, 'de'));
   sel.innerHTML = '<option value="' + firstValue + '">' + firstLabel + '</option>' +
     ps.map((p) => '<option value="' + p + '">' + p + '</option>').join('');
 }
