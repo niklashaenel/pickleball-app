@@ -66,7 +66,11 @@ Der Spielstand wird mit **vorab erzeugten, natürlichen Audio-Schnipseln** anges
 (männliche Stimme „Conrad") — klingt menschlicher und läuft **offline**, in **jedem**
 Browser (auch iOS Safari). Einstellung: **⚙︎ → „Natürliche Stimme (Audio)"** (Standard an).
 - Der **Spielstand-Ruf** wird als **ein** natürliches Schnipsel gesprochen (klingt wie ein
-  Satz, nicht zusammengestückelt) — für Stände 0–15. Darüber/Sonderfälle: Einzel-Wörter.
+  Satz, nicht zusammengestückelt) — für Stände 0–21. Darüber/Sonderfälle: Einzel-Wörter.
+- **Spielernamen:** In den Einstellungen bei „Name Team A/B" können die **Vereinsnamen**
+  aus der Liste gewählt werden (Einzel + alle Doppel-Paarungen) — diese werden ebenfalls
+  natürlich angesagt. Eigene, nicht hinterlegte Namen sagt die Geräte-Stimme.
+  Neue Namen: in `generate_voice.py` die Liste `PLAYERS` ergänzen und Skript erneut starten.
 - **Eigene** Team-Namen sagt die Geräte-Stimme (siehe unten) — wer das vermeiden will,
   bleibt einfach bei „Team A" / „Team B".
 - Sind keine Schnipsel vorhanden, nutzt die App automatisch die Geräte-Stimme.

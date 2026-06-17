@@ -660,32 +660,79 @@ function buildClipKeys(event) {
   return keys;
 }
 
-// Volle Ansage-Schnipsel bevorzugen (ganzer Ruf in einem Stück = natürliche Betonung)
+// ---- Vereins-Spielernamen (für natürliche Namens-Ansagen) ----
+const CLUB_PLAYERS = ['Niki', 'Silas', 'Eric', 'Petra', 'Tobias', 'Yassine', 'Christoph',
+  'Kamil', 'Luis', 'Simon', 'Sven', 'Uyen', 'Barbara', 'Inna', 'Serhi', 'Helena', 'Simone',
+  'Kevin', 'Iris', 'Jürgen', 'Silke', 'Tilo', 'Jule', 'Vasilisa', 'Melli', 'Viktor', 'Matthias'];
+function slug(s) {
+  return String(s).toLowerCase()
+    .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+    .replace(/[^a-z0-9]/g, '');
+}
+const CLUB_SLUGS = new Set(CLUB_PLAYERS.map(slug));
+// Clip-Schlüssel für einen (Vereins-)Namen, sonst null
+function clubNameKey(nm) {
+  const parts = String(nm).split('+').map((s) => s.trim()).filter(Boolean);
+  if (!parts.length) return null;
+  const slugs = parts.map(slug);
+  if (slugs.some((s) => !CLUB_SLUGS.has(s))) return null;
+  slugs.sort();
+  return 'name_' + slugs.join('-');
+}
+function teamClipKey(t) {
+  const nm = teamName(t);
+  if (nm === 'Team A') return 'team-a';
+  if (nm === 'Team B') return 'team-b';
+  return clubNameKey(nm);
+}
+
+// Volle Ansage-Schnipsel bevorzugen (ganze Phrasen = natürliche Betonung)
 function buildPhraseKeys(event) {
-  if (game.over) return null;            // Spielende über Wort-Fallback (selten)
+  if (game.over) {
+    const tk = teamClipKey(game.winner);
+    if (!tk) return null;
+    if (settings.matchBestOf > 1 && match[game.winner] >= gamesNeeded()) {
+      return ['match', tk, 'gewinnt-das-match'];
+    }
+    if (settings.matchBestOf > 1) return null; // "Spiel für ..., Satzstand ..." -> Wort-Fallback
+    return ['spiel', tk, 'gewinnt'];
+  }
   const nums = callText();
   if (nums[0] > 21 || nums[1] > 21) return null; // außerhalb des erzeugten Bereichs
   const call = settings.mode === 'doubles'
     ? 'd_' + nums[0] + '_' + nums[1] + '_' + nums[2]
     : 's_' + nums[0] + '_' + nums[1];
   const keys = [];
-  if (event === 'sideout') {
-    if (settings.announceTeam) {
-      const nm = teamName(game.serving);
-      if (nm === 'Team A') keys.push('so_a');       // "Seitenwechsel, Aufschlag Team A" am Stück
-      else if (nm === 'Team B') keys.push('so_b');
-      else return null;                  // eigener Name -> Wort-Fallback/Stimme
-    } else {
-      keys.push('seitenwechsel');
+  if (event === 'sideout' && settings.announceTeam) {
+    const nm = teamName(game.serving);
+    if (nm === 'Team A') keys.push('so_a');       // "Seitenwechsel, Aufschlag Team A" am Stück
+    else if (nm === 'Team B') keys.push('so_b');
+    else {
+      const tk = teamClipKey(game.serving);
+      if (!tk) return null;                       // unbekannter Name -> Wort-Fallback/Stimme
+      keys.push('so_pre', tk);                    // "Seitenwechsel, Aufschlag" + Name
     }
+  } else if (event === 'sideout') {
+    keys.push('seitenwechsel');
   }
-  keys.push(call);                       // <- der natürliche Voll-Ruf
+  keys.push(call);
   const a = game.scores.A, b = game.scores.B;
   if (event === 'point' && settings.winBy2 && a === b && a >= settings.target - 1) {
     if (a + 2 <= 30) keys.push('verlaengerung', 'es-geht-bis', String(a + 2));
     else return null;
   }
   return keys;
+}
+
+// Auswahlliste der Vereins-Namen (Einzel + alle Paarungen) füllen
+function populateClubNames() {
+  const dl = document.querySelector('#clubNames');
+  if (!dl) return;
+  const ps = CLUB_PLAYERS.slice().sort((a, b) => slug(a).localeCompare(slug(b)));
+  const opts = ['Team A', 'Team B'].concat(ps);
+  for (let i = 0; i < ps.length; i++)
+    for (let j = i + 1; j < ps.length; j++) opts.push(ps[i] + ' + ' + ps[j]);
+  dl.innerHTML = opts.map((o) => '<option value="' + o + '"></option>').join('');
 }
 
 /* =========================================================================
@@ -950,6 +997,7 @@ function init() {
   if (!localStorage.getItem('pb-intro-seen')) show('intro');
   updateKeyLabels();
   populateVoices();
+  populateClubNames();
   probeClips();
   render();
 }
