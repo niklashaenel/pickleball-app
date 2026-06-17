@@ -1,5 +1,5 @@
 // Service Worker: macht die App nach dem ersten Laden offline nutzbar.
-const CACHE = 'pickleball-v2';
+const CACHE = 'pickleball-v3';
 const ASSETS = [
   './',
   './index.html',
