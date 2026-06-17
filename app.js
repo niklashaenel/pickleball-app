@@ -570,10 +570,8 @@ let clipNodes = [];
 const clipBuffers = {};
 
 function probeClips() {
-  const p = new Audio();
-  p.addEventListener('loadeddata', () => { clipsAvailable = true; }, { once: true });
-  p.addEventListener('error', () => { clipsAvailable = false; }, { once: true });
-  p.src = 'voice/0.mp3';
+  // fetch statt Audio-Element: funktioniert auf iOS auch ohne erste Nutzergeste
+  fetch('voice/0.mp3').then((r) => { clipsAvailable = r.ok; }).catch(() => { clipsAvailable = false; });
 }
 
 // Schnipsel laden und als AudioBuffer dekodieren (für lückenloses Abspielen)
@@ -1014,7 +1012,15 @@ document.addEventListener('visibilitychange', () => {
 /* Sprachausgabe braucht eine erste Nutzer-Interaktion, um zuverlässig zu starten */
 function primeSpeech() {
   requestWakeLock();
-  ensureAudio();
+  const ctx = ensureAudio();
+  if (ctx) {
+    // Stiller 1-Sample-Buffer schaltet Web Audio auf iOS zuverlässig frei
+    try {
+      const b = ctx.createBuffer(1, 1, 22050);
+      const s = ctx.createBufferSource();
+      s.buffer = b; s.connect(ctx.destination); s.start(0);
+    } catch (e) {}
+  }
   preloadClips();
   if ('speechSynthesis' in window) {
     try { speechSynthesis.getVoices(); } catch (e) {}
