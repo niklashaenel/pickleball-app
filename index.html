@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=10" />
+  <link rel="stylesheet" href="styles.css?v=11" />
 </head>
 <body>
   <!-- Kopfzeile: Undo, offizieller Spielstand-Ruf, Menü -->
@@ -172,15 +172,20 @@
       </label>
 
       <label class="row">
-        <span>Name Team A</span>
-        <input type="text" id="setNameA" list="clubNames" maxlength="40" placeholder="Team A" />
+        <span>Team A</span>
+        <span class="rowctl">
+          <select id="setA1"></select>
+          <select id="setA2"></select>
+        </span>
       </label>
 
       <label class="row">
-        <span>Name Team B</span>
-        <input type="text" id="setNameB" list="clubNames" maxlength="40" placeholder="Team B" />
+        <span>Team B</span>
+        <span class="rowctl">
+          <select id="setB1"></select>
+          <select id="setB2"></select>
+        </span>
       </label>
-      <datalist id="clubNames"></datalist>
 
       <hr />
       <h3>Tipper-Modus (iPhone + Seitenwender)</h3>
@@ -250,6 +255,6 @@
     </div>
   </dialog>
 
-  <script src="app.js?v=10"></script>
+  <script src="app.js?v=11"></script>
 </body>
 </html>

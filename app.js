@@ -724,15 +724,40 @@ function buildPhraseKeys(event) {
   return keys;
 }
 
-// Auswahlliste der Vereins-Namen (Einzel + alle Paarungen) füllen
-function populateClubNames() {
-  const dl = document.querySelector('#clubNames');
-  if (!dl) return;
+// Spieler-Auswahl pro Team (Spieler 1 / Spieler 2)
+function fillPlayerSelect(sel, firstLabel, firstValue) {
+  if (!sel) return;
   const ps = CLUB_PLAYERS.slice().sort((a, b) => slug(a).localeCompare(slug(b)));
-  const opts = ['Team A', 'Team B'].concat(ps);
-  for (let i = 0; i < ps.length; i++)
-    for (let j = i + 1; j < ps.length; j++) opts.push(ps[i] + ' + ' + ps[j]);
-  dl.innerHTML = opts.map((o) => '<option value="' + o + '"></option>').join('');
+  sel.innerHTML = '<option value="' + firstValue + '">' + firstLabel + '</option>' +
+    ps.map((p) => '<option value="' + p + '">' + p + '</option>').join('');
+}
+function populateTeamSelects() {
+  fillPlayerSelect(document.querySelector('#setA1'), 'Team A', 'Team A');
+  fillPlayerSelect(document.querySelector('#setA2'), '— (kein Partner)', '');
+  fillPlayerSelect(document.querySelector('#setB1'), 'Team B', 'Team B');
+  fillPlayerSelect(document.querySelector('#setB2'), '— (kein Partner)', '');
+}
+// Team-Namen aus den beiden Auswahl-Menüs ableiten
+function teamFromSelects(team) {
+  const v1 = document.querySelector('#set' + team + '1').value;
+  const v2 = document.querySelector('#set' + team + '2').value;
+  const players = [];
+  if (v1 && v1 !== 'Team A' && v1 !== 'Team B') players.push(v1);
+  if (v2) players.push(v2);
+  let name;
+  if (!players.length) name = 'Team ' + team;
+  else if (players.length === 1) name = players[0];
+  else name = players.slice().sort((a, b) => slug(a).localeCompare(slug(b))).join(' + ');
+  settings.names[team] = name;
+  saveSettings();
+  render();
+}
+// Auswahl-Menüs auf den aktuellen Team-Namen einstellen
+function setSelectsFromName(team) {
+  const parts = teamName(team).split('+').map((s) => s.trim()).filter(Boolean);
+  const known = parts.filter((p) => CLUB_PLAYERS.indexOf(p) !== -1);
+  document.querySelector('#set' + team + '1').value = known.length ? known[0] : ('Team ' + team);
+  document.querySelector('#set' + team + '2').value = known.length >= 2 ? known[1] : '';
 }
 
 /* =========================================================================
@@ -898,8 +923,8 @@ function openSettings() {
   $('#setSwap').checked = settings.swapSides;
   $('#setTipper').checked = settings.tipperMode;
   $('#setTipperSetup').checked = tipperSetup;
-  $('#setNameA').value = settings.names.A;
-  $('#setNameB').value = settings.names.B;
+  setSelectsFromName('A');
+  setSelectsFromName('B');
   updateKeyLabels();
   $('#learnStatus').textContent = '';
   $('#settings').showModal();
@@ -930,8 +955,10 @@ $('#setVoice').addEventListener('change', (e) => { settings.voiceURI = e.target.
 $('#setSwap').addEventListener('change', (e) => { settings.swapSides = e.target.checked; saveSettings(); render(); });
 $('#setTipper').addEventListener('change', (e) => { settings.tipperMode = e.target.checked; if (!settings.tipperMode) tipperSetup = false; saveSettings(); render(); });
 $('#setTipperSetup').addEventListener('change', (e) => { tipperSetup = e.target.checked; render(); });
-$('#setNameA').addEventListener('input', (e) => { settings.names.A = e.target.value.trim() || 'Team A'; saveSettings(); render(); });
-$('#setNameB').addEventListener('input', (e) => { settings.names.B = e.target.value.trim() || 'Team B'; saveSettings(); render(); });
+$('#setA1').addEventListener('change', () => teamFromSelects('A'));
+$('#setA2').addEventListener('change', () => teamFromSelects('A'));
+$('#setB1').addEventListener('change', () => teamFromSelects('B'));
+$('#setB2').addEventListener('change', () => teamFromSelects('B'));
 
 $('#newGameBtn').addEventListener('click', () => { $('#settings').close(); resetGame(); });
 $('#flipServe').addEventListener('click', flipServe);
@@ -997,7 +1024,7 @@ function init() {
   if (!localStorage.getItem('pb-intro-seen')) show('intro');
   updateKeyLabels();
   populateVoices();
-  populateClubNames();
+  populateTeamSelects();
   probeClips();
   render();
 }
