@@ -65,7 +65,8 @@ Bevor du dich auf einen Knopf verlässt, prüfe, ob seine Tasten beim Handy anko
 Der Spielstand wird mit **vorab erzeugten, natürlichen Audio-Schnipseln** angesagt
 (männliche Stimme „Conrad") — klingt menschlicher und läuft **offline**, in **jedem**
 Browser (auch iOS Safari). Einstellung: **⚙︎ → „Natürliche Stimme (Audio)"** (Standard an).
-- Zahlen und feste Wörter (auch „Team A"/„Team B") kommen aus den Schnipseln.
+- Der **Spielstand-Ruf** wird als **ein** natürliches Schnipsel gesprochen (klingt wie ein
+  Satz, nicht zusammengestückelt) — für Stände 0–15. Darüber/Sonderfälle: Einzel-Wörter.
 - **Eigene** Team-Namen sagt die Geräte-Stimme (siehe unten) — wer das vermeiden will,
   bleibt einfach bei „Team A" / „Team B".
 - Sind keine Schnipsel vorhanden, nutzt die App automatisch die Geräte-Stimme.

@@ -5,12 +5,16 @@
 #   python generate_voice.py
 #
 # Erzeugt mp3-Dateien im Ordner "voice/".  Stimme: männlich (de-DE-ConradNeural).
+# - Einzelwoerter (Fallback)  : 0..30, "zu", "seitenwechsel", ...
+# - VOLLE Spielstand-Rufe      : "d_a_b_c" (Doppel) und "s_a_b" (Einzel) fuer a,b = 0..MAX
+#   Diese klingen natuerlich, weil der ganze Ruf in EINEM Stueck gesprochen wird.
 
 import asyncio
 import os
 import edge_tts
 
 VOICE = "de-DE-ConradNeural"
+MAX = 15  # Voll-Rufe fuer Staende 0..MAX
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "voice")
 os.makedirs(OUT, exist_ok=True)
 
@@ -39,18 +43,31 @@ clips.update({
     "team-b": "Team B",
 })
 
+# Volle Spielstand-Rufe (ein Stück = natuerliche Betonung)
+for a in range(MAX + 1):
+    for b in range(MAX + 1):
+        clips["s_%d_%d" % (a, b)] = "%s zu %s" % (WORDS[a], WORDS[b])
+        for c in (1, 2):
+            clips["d_%d_%d_%d" % (a, b, c)] = "%s zu %s, %s" % (WORDS[a], WORDS[b], WORDS[c])
+
+sem = asyncio.Semaphore(10)
+done = 0
 
 async def gen(name, text):
+    global done
     path = os.path.join(OUT, name + ".mp3")
-    await edge_tts.Communicate(text, VOICE).save(path)
-    print("ok:", name, "->", text)
-
+    if os.path.exists(path) and os.path.getsize(path) > 0:
+        done += 1
+        return
+    async with sem:
+        await edge_tts.Communicate(text, VOICE).save(path)
+        done += 1
+        if done % 100 == 0:
+            print("...", done, "/", len(clips))
 
 async def main():
-    for name, text in clips.items():
-        await gen(name, text)
-
+    await asyncio.gather(*(gen(n, t) for n, t in clips.items()))
 
 if __name__ == "__main__":
     asyncio.run(main())
-    print("Fertig:", len(clips), "Dateien in", OUT)
+    print("Fertig:", len(clips), "Schnipsel in", OUT)

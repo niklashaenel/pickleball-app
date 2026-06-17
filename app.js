@@ -388,7 +388,7 @@ function scorePhrase() {
   return say(nums[0]) + ' zu ' + say(nums[1]);
 }
 
-function announce(event, force) {
+async function announce(event, force) {
   if (!settings.announce && !force) return;
   const phrases = [];
   if (game.over) {
@@ -418,10 +418,15 @@ function announce(event, force) {
     }
   }
   stopVoice();
-  // Natürliche Schnipsel verwenden, wenn aktiviert, vorhanden und Web Audio bereit
+  const myGen = clipGen;
+  // 1) Voller Ruf als ein Schnipsel (natürlich), 2) Wort-Schnipsel, sonst Geräte-Stimme
   if (settings.naturalVoice && clipsAvailable && ensureAudio()) {
-    const keys = buildClipKeys(event);
-    if (keys) { playClips(keys); return; }
+    for (const keys of [buildPhraseKeys(event), buildClipKeys(event)]) {
+      if (!keys) continue;
+      const entries = await Promise.all(keys.map((k) => loadClip(k)));
+      if (myGen !== clipGen) return;           // ein neuerer Aufruf hat übernommen
+      if (entries.every(Boolean)) { playEntries(entries); return; }
+    }
   }
   // sonst Geräte-Stimme (fließender Komma-Satz; Punkt am Ende gegen Abschneiden)
   if (!('speechSynthesis' in window)) return;
@@ -599,22 +604,16 @@ function stopVoice() {
 }
 
 // Schnipsel lückenlos nacheinander planen (Web Audio)
-async function playClips(keys) {
+// Vorab geladene Schnipsel-Segmente lückenlos planen
+function playEntries(entries) {
   const ctx = ensureAudio();
   if (!ctx) return;
-  const myGen = ++clipGen;
-  const entries = [];
-  for (const k of keys) {
-    const en = await loadClip(k);
-    if (myGen !== clipGen) return; // unterbrochen
-    entries.push(en);
-  }
+  const valid = entries.filter(Boolean);
   let t = ctx.currentTime + 0.04;
-  const GAP = 0.22; // natürliche Pause zwischen den Wörtern (~Viertelsekunde)
-  entries.forEach((en, idx) => {
-    if (!en) return;
-    const isLast = idx === entries.length - 1;
-    // letztes Wort länger ausklingen lassen, damit es nicht abgehackt klingt
+  const GAP = 0.22; // natürliche Pause zwischen den Segmenten
+  valid.forEach((en, idx) => {
+    const isLast = idx === valid.length - 1;
+    // letztes Segment länger ausklingen lassen, damit es nicht abgehackt klingt
     const dur = isLast ? Math.min(en.buf.duration - en.offset, en.dur + 0.25) : en.dur;
     const src = ctx.createBufferSource();
     src.buffer = en.buf;
@@ -658,6 +657,33 @@ function buildClipKeys(event) {
     }
   }
   if (bad || !keys.every((k) => CLIP_KEYS.has(k))) return null;
+  return keys;
+}
+
+// Volle Ansage-Schnipsel bevorzugen (ganzer Ruf in einem Stück = natürliche Betonung)
+function buildPhraseKeys(event) {
+  if (game.over) return null;            // Spielende über Wort-Fallback (selten)
+  const nums = callText();
+  if (nums[0] > 15 || nums[1] > 15) return null; // außerhalb des erzeugten Bereichs
+  const call = settings.mode === 'doubles'
+    ? 'd_' + nums[0] + '_' + nums[1] + '_' + nums[2]
+    : 's_' + nums[0] + '_' + nums[1];
+  const keys = [];
+  if (event === 'sideout') {
+    keys.push('seitenwechsel');
+    if (settings.announceTeam) {
+      const nm = teamName(game.serving);
+      if (nm === 'Team A') keys.push('aufschlag', 'team-a');
+      else if (nm === 'Team B') keys.push('aufschlag', 'team-b');
+      else return null;                  // eigener Name -> Wort-Fallback/Stimme
+    }
+  }
+  keys.push(call);                       // <- der natürliche Voll-Ruf
+  const a = game.scores.A, b = game.scores.B;
+  if (event === 'point' && settings.winBy2 && a === b && a >= settings.target - 1) {
+    if (a + 2 <= 30) keys.push('verlaengerung', 'es-geht-bis', String(a + 2));
+    else return null;
+  }
   return keys;
 }
 
