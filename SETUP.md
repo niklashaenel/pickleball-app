@@ -71,6 +71,9 @@ unter den installierten Stimmen die schönste auswählen (eine Hörprobe kommt s
   der App unter „Stimme" auf — das klingt deutlich natürlicher.
 - **Android:** Bessere Stimmen über **Einstellungen → Sprache/Verwaltung → Text-in-Sprache
   → Google Sprachausgabe** (deutsche Sprachdaten installieren).
+- **Natürlichste Stimme (gratis):** Die App in **Microsoft Edge** öffnen und unter
+  **Stimme** eine **„(Natural)"**-Stimme wählen (z. B. „Katja Online (Natural)").
+  Diese neuronalen Stimmen klingen fast menschlich, brauchen aber **Internet**.
 
 Tipp: Team-Namen mit „+" werden als „und" gesprochen (z. B. „Silas + Niki" → „Silas und Niki").
 

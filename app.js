@@ -446,7 +446,13 @@ function pickVoice() {
   }
   const de = germanVoices();
   if (!de.length) return null;
-  return de.find((v) => /natural|neural|enhanced|premium|google/i.test(v.name)) || de[0];
+  // bevorzugt natürliche/neuronale Stimmen (z.B. Edge "Online (Natural)")
+  const tiers = [/natural|neural|online/i, /enhanced|premium/i, /google/i];
+  for (const re of tiers) {
+    const m = de.find((v) => re.test(v.name));
+    if (m) return m;
+  }
+  return de[0];
 }
 // Namen sprechbar machen ("Silas + Niki" -> "Silas und Niki")
 function speakName(name) {
