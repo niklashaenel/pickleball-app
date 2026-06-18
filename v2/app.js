@@ -30,11 +30,50 @@ const DEFAULT_SETTINGS = {
   startServer: 'A', // welches Team zuerst aufschlägt
   showStartChooser: true, // Aufschlag-Auswahl beim Spielstart zeigen
   swapSides: false,
+  theme: 'neon',    // Farb-Design
   names: { A: 'Team A', B: 'Team B' }
 };
 
 // Feste Tastatur-Kürzel (unsichtbarer Desktop-Komfort): A/B zählen, Undo, Wiederholen
 const KEYBOARD = { A: 'ArrowLeft', B: 'ArrowRight', undo: 'Backspace', repeat: 'Enter' };
+
+/* ---- Farb-Designs (Themes) ---- */
+const THEMES = [
+  { id: 'neon',   name: 'Neon',    bg: '#05060d', text: '#eaf6ff', muted: '#8aa6c0', a: '#00e5ff', b: '#fdff2f', accent: '#fdff6a', aRgb: '0,229,255',  bRgb: '250,255,0' },
+  { id: 'sunset', name: 'Sunset',  bg: '#190a14', text: '#ffe9f3', muted: '#c79ab0', a: '#ff4d9d', b: '#ffae3b', accent: '#ffd166', aRgb: '255,77,157', bRgb: '255,174,59' },
+  { id: 'ocean',  name: 'Ozean',   bg: '#04101a', text: '#e6f7ff', muted: '#7fa6bf', a: '#2ce0d6', b: '#4d9bff', accent: '#8fe9ff', aRgb: '44,224,214', bRgb: '77,155,255' },
+  { id: 'forest', name: 'Wald',    bg: '#07140d', text: '#e7fff0', muted: '#8db9a0', a: '#5cff8f', b: '#ffd23f', accent: '#aef7c3', aRgb: '92,255,143', bRgb: '255,210,63' },
+  { id: 'grape',  name: 'Traube',  bg: '#120a1e', text: '#f1e8ff', muted: '#a892c7', a: '#b06bff', b: '#45e0ff', accent: '#d8b4ff', aRgb: '176,107,255', bRgb: '69,224,255' },
+  { id: 'fire',   name: 'Feuer',   bg: '#1a0707', text: '#ffeae0', muted: '#c79a90', a: '#ff5470', b: '#ff9f1c', accent: '#ffd6a0', aRgb: '255,84,112', bRgb: '255,159,28' },
+  { id: 'candy',  name: 'Candy',   bg: '#14091a', text: '#ffe8fb', muted: '#c49ac0', a: '#ff5cce', b: '#29e0c0', accent: '#ffc2ef', aRgb: '255,92,206', bRgb: '41,224,192' },
+  { id: 'mono',   name: 'Mono',    bg: '#0c0e12', text: '#eef3fb', muted: '#90a0b5', a: '#e8f0ff', b: '#9fb3c8', accent: '#cfe0ff', aRgb: '232,240,255', bRgb: '159,179,200' },
+  { id: 'lava',   name: 'Lava',    bg: '#160a05', text: '#ffeede', muted: '#c39d82', a: '#ff7a18', b: '#ffd400', accent: '#ffb056', aRgb: '255,122,24', bRgb: '255,212,0' },
+  { id: 'mint',   name: 'Mint',    bg: '#06140f', text: '#e6fff5', muted: '#84b8a4', a: '#27f5b5', b: '#7af9ff', accent: '#aeffe6', aRgb: '39,245,181', bRgb: '122,249,255' }
+];
+function applyTheme(id) {
+  const t = THEMES.find((x) => x.id === id) || THEMES[0];
+  const r = document.documentElement.style;
+  r.setProperty('--bg', t.bg);
+  r.setProperty('--text', t.text);
+  r.setProperty('--muted', t.muted);
+  r.setProperty('--cyan', t.a);
+  r.setProperty('--gold', t.b);
+  r.setProperty('--accent', t.accent);
+  r.setProperty('--cyan-rgb', t.aRgb);
+  r.setProperty('--gold-rgb', t.bRgb);
+  document.querySelectorAll('.swatch').forEach((s) => s.classList.toggle('active', s.dataset.theme === t.id));
+}
+function buildThemeGrid() {
+  const grid = document.querySelector('#themeGrid');
+  if (!grid) return;
+  grid.innerHTML = THEMES.map((t) =>
+    '<button type="button" class="swatch" data-theme="' + t.id + '" title="' + t.name +
+    '" style="--sw-bg:' + t.bg + ';--sw-a:' + t.a + ';--sw-b:' + t.b + '">' +
+    '<span class="sw-prev"></span><span class="sw-name">' + t.name + '</span></button>').join('');
+  grid.querySelectorAll('.swatch').forEach((s) => s.addEventListener('click', () => {
+    settings.theme = s.dataset.theme; saveSettings(); applyTheme(settings.theme);
+  }));
+}
 
 // Vorübergehende Zustände (nicht gespeichert)
 let startChosen = false; // wurde der Startaufschlag für das aktuelle Spiel schon bestätigt?
@@ -49,6 +88,7 @@ const other = (t) => (t === 'A' ? 'B' : 'A');
 
 /* ---- Zustand ---- */
 let settings = loadSettings();
+applyTheme(settings.theme); // Farb-Design früh setzen (kein Aufblitzen)
 let game = loadGame() || newGame();
 let history = [];
 let match = (() => { try { return JSON.parse(localStorage.getItem(KEY_MATCH)) || { A: 0, B: 0 }; } catch (e) { return { A: 0, B: 0 }; } })();
@@ -1140,6 +1180,8 @@ if ('serviceWorker' in navigator &&
    ========================================================================= */
 function init() {
   if (!localStorage.getItem('pb-intro-seen')) show('intro');
+  buildThemeGrid();
+  applyTheme(settings.theme); // markiert die aktive Vorschau
   populateTeamSelects();
   populateMatchmaker();
   fetchOnlineMatches();
