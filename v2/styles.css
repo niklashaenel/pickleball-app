@@ -317,6 +317,13 @@ a { color: var(--cyan); }
 }
 .swatch .sw-name { font-size: .72rem; color: var(--sw-text, #fff); font-weight: 600; letter-spacing: .02em; }
 .swatch.active { border-color: #fff; box-shadow: 0 0 0 2px var(--sw-a), 0 0 12px var(--sw-a); }
+/* Farbpaletten-Auswahl (kleinere Zwei-Farben-Chips) */
+.palette-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(3.4rem, 1fr)); gap: .45rem; margin: .4rem 0 .2rem; }
+.pswatch { cursor: pointer; background: transparent; border: 2px solid transparent; border-radius: .55rem; padding: 3px; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.pswatch:active { transform: scale(.95); }
+.pswatch .pchip { width: 100%; height: 1.4rem; border-radius: .4rem; background: linear-gradient(135deg, var(--pa) 0 50%, var(--pb) 50% 100%); }
+.pswatch .pname { font-size: .6rem; color: var(--text); opacity: .75; line-height: 1.1; }
+.pswatch.active { border-color: var(--text); }
 
 /* ============================================================
    Design-Stile: Form & Deko (Farben + Schriften kommen aus den Variablen)

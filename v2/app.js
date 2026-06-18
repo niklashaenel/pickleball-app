@@ -30,7 +30,8 @@ const DEFAULT_SETTINGS = {
   startServer: 'A', // welches Team zuerst aufschlägt
   showStartChooser: true, // Aufschlag-Auswahl beim Spielstart zeigen
   swapSides: false,
-  theme: 'neon',    // Farb-Design
+  theme: 'neon',     // Design-Stil
+  palette: 'auto',   // Farbpalette ('auto' = Farben des Designs)
   names: { A: 'Team A', B: 'Team B' }
 };
 
@@ -55,6 +56,26 @@ const THEMES = [
   { id: 'pastell', name: 'Pastell', bg: '#fff5f0', text: '#5b4a52', muted: '#a98f99', a: '#ff7d97', b: '#34bca8', accent: '#d4537e', aRgb: '255,125,151', bRgb: '52,188,168',
     fd: FD.fredoka, fu: FD.fredoka, surface: '#fffaf7', surface2: '#fdeee8', backdrop: 'rgba(80,50,60,.34)', line: 'rgba(150,90,110,.2)' }
 ];
+/* ---- Farbpaletten: überschreiben Team-A/B + Akzent über jedes Design ---- */
+/* Mitteltöne, damit sie auf dunklen (Glühen) UND hellen (Text) Designs gut aussehen. */
+const PALETTES = [
+  { id: 'auto', name: 'Original' },
+  { id: 'cyangold',   name: 'Cyan/Gold',     a: '#00cfe5', b: '#f2c200', aRgb: '0,207,229',   bRgb: '242,194,0' },
+  { id: 'blauorange', name: 'Blau/Orange',   a: '#3b82f6', b: '#fb923c', aRgb: '59,130,246',  bRgb: '251,146,60' },
+  { id: 'lilatuerkis',name: 'Lila/Türkis',   a: '#8b5cf6', b: '#22d3ee', aRgb: '139,92,246',  bRgb: '34,211,238' },
+  { id: 'pinkgruen',  name: 'Pink/Grün',     a: '#ec4899', b: '#22c55e', aRgb: '236,72,153',  bRgb: '34,197,94' },
+  { id: 'rotblau',    name: 'Rot/Blau',      a: '#ef4444', b: '#3b82f6', aRgb: '239,68,68',   bRgb: '59,130,246' },
+  { id: 'gruengold',  name: 'Grün/Gold',     a: '#16a34a', b: '#eab308', aRgb: '22,163,74',   bRgb: '234,179,8' },
+  { id: 'korallminze',name: 'Koralle/Minze', a: '#fb7185', b: '#2dd4bf', aRgb: '251,113,133', bRgb: '45,212,191' },
+  { id: 'magentacyan',name: 'Magenta/Cyan',  a: '#d946ef', b: '#06b6d4', aRgb: '217,70,239',  bRgb: '6,182,212' }
+];
+function applyPaletteColors() {
+  const p = PALETTES.find((x) => x.id === settings.palette);
+  if (!p || p.id === 'auto') return; // Farben des Designs behalten (schon gesetzt)
+  const r = document.documentElement.style;
+  r.setProperty('--cyan', p.a); r.setProperty('--gold', p.b); r.setProperty('--accent', p.a);
+  r.setProperty('--cyan-rgb', p.aRgb); r.setProperty('--gold-rgb', p.bRgb);
+}
 function applyTheme(id) {
   const t = THEMES.find((x) => x.id === id) || THEMES[0];
   const r = document.documentElement.style;
@@ -64,9 +85,14 @@ function applyTheme(id) {
   r.setProperty('--surface', t.surface); r.setProperty('--surface-2', t.surface2);
   r.setProperty('--backdrop', t.backdrop); r.setProperty('--line', t.line);
   r.setProperty('--font-display', t.fd); r.setProperty('--font-ui', t.fu);
+  applyPaletteColors(); // ggf. Farben überschreiben
   const b = document.body;
   if (b) { b.className = b.className.replace(/\bdesign-\S+/g, '').trim(); b.classList.add('design-' + t.id); }
   document.querySelectorAll('.swatch').forEach((s) => s.classList.toggle('active', s.dataset.theme === t.id));
+  document.querySelectorAll('.pswatch').forEach((s) => s.classList.toggle('active', s.dataset.palette === (settings.palette || 'auto')));
+  // Original-Chip zeigt die nativen Design-Farben (unabhängig von der gewählten Palette)
+  const autoSw = document.querySelector('.pswatch[data-palette="auto"]');
+  if (autoSw) { autoSw.style.setProperty('--pa', t.a); autoSw.style.setProperty('--pb', t.b); }
 }
 function buildThemeGrid() {
   const grid = document.querySelector('#themeGrid');
@@ -77,6 +103,19 @@ function buildThemeGrid() {
     '<span class="sw-prev"></span><span class="sw-name">' + t.name + '</span></button>').join('');
   grid.querySelectorAll('.swatch').forEach((s) => s.addEventListener('click', () => {
     settings.theme = s.dataset.theme; saveSettings(); applyTheme(settings.theme);
+  }));
+}
+function buildPaletteGrid() {
+  const grid = document.querySelector('#paletteGrid');
+  if (!grid) return;
+  grid.innerHTML = PALETTES.map((p) => {
+    const pa = p.id === 'auto' ? 'var(--cyan)' : p.a;
+    const pb = p.id === 'auto' ? 'var(--gold)' : p.b;
+    return '<button type="button" class="pswatch" data-palette="' + p.id + '" title="' + p.name +
+      '" style="--pa:' + pa + ';--pb:' + pb + '"><span class="pchip"></span><span class="pname">' + p.name + '</span></button>';
+  }).join('');
+  grid.querySelectorAll('.pswatch').forEach((s) => s.addEventListener('click', () => {
+    settings.palette = s.dataset.palette; saveSettings(); applyTheme(settings.theme);
   }));
 }
 
@@ -1186,7 +1225,8 @@ if ('serviceWorker' in navigator &&
 function init() {
   if (!localStorage.getItem('pb-intro-seen')) show('intro');
   buildThemeGrid();
-  applyTheme(settings.theme); // markiert die aktive Vorschau
+  buildPaletteGrid();
+  applyTheme(settings.theme); // markiert aktives Design + Palette
   populateTeamSelects();
   populateMatchmaker();
   fetchOnlineMatches();
