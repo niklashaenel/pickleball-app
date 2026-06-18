@@ -954,10 +954,11 @@ updateSwipeLayer();
 // Ring UND Uhr senden dieselben Media-Events (nicht unterscheidbar):
 //   hoch/next   1× = Punkt A,  2× schnell = Punkt zurück (Undo, mit Ton)
 //   runter/prev 1× = Punkt B,  2× schnell = Punkt zurück (Undo, mit Ton)
-//   Mitte/Play-Pause = Stand ansagen
-// Zählen bleibt sofort; ein schneller zweiter Druck (hoch ODER runter) nimmt zurück.
-const DBL_MS = 800; // Zeitfenster für "schnell doppelt" bei hoch/runter
-let lastNextPress = 0, lastPrevPress = 0, lastMiddlePress = 0;
+//   Mitte/Play-Pause 1× = Stand ansagen, 2× schnell = Punkt zurück (Undo)
+// Zählen bleibt sofort; ein schneller zweiter Druck nimmt zurück.
+const DBL_MS = 800;    // Zeitfenster für "schnell doppelt" bei hoch/runter
+const MID_MS = 600;    // Zeitfenster für Doppel-Tipp auf die Mitte (Uhr)
+let lastNextPress = 0, lastPrevPress = 0, middleTimer = null;
 function onMediaNext() {
   ensureAudio();
   const now = Date.now();
@@ -971,13 +972,11 @@ function onMediaPrev() {
   else { lastPrevPress = now; rallyWonBy('B'); }
 }
 function onMediaMiddle() {
-  // Mitte = Stand ansagen. Entprellen: schnelle Folge-Tipps (oder Doppel-Signale der Uhr
-  // pro Druck) ignorieren, damit die Ansage nicht ständig neu startet und abbricht.
+  // Mitte/Play-Pause: 1× (allein) = Stand ansagen, 2× schnell = Punkt zurück (Undo).
+  // Timer statt sofort: mehrfaches Tippen stottert nicht (Ansage wird vom 2. Druck verworfen).
   ensureAudio();
-  const now = Date.now();
-  if (now - lastMiddlePress < 1500) return;
-  lastMiddlePress = now;
-  announce(undefined, true);
+  if (middleTimer) { clearTimeout(middleTimer); middleTimer = null; undo(); return; } // doppelt = Undo
+  middleTimer = setTimeout(() => { middleTimer = null; announce(undefined, true); }, MID_MS);
 }
 function startMediaSession() {
   if (!settings.watchControl) return;
