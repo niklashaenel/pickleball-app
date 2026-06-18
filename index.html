@@ -13,9 +13,12 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=13" />
+  <link rel="stylesheet" href="styles.css?v=14" />
 </head>
 <body>
+  <!-- Vollflächiger Farb-Blitz bei einem Punkt (aus Distanz sichtbar) -->
+  <div id="scoreFlash"></div>
+
   <!-- Kopfzeile: Undo, offizieller Spielstand-Ruf, Menü -->
   <header id="bar">
     <button id="undoBtn" class="barbtn" title="Rückgängig" aria-label="Rückgängig">↩︎</button>
@@ -172,6 +175,16 @@
       </label>
 
       <label class="row">
+        <span>Ring-/Scroll-Steuerung</span>
+        <input type="checkbox" id="setRing" />
+      </label>
+
+      <label class="row">
+        <span>Smartwatch-Steuerung (Media)</span>
+        <input type="checkbox" id="setWatch" />
+      </label>
+
+      <label class="row">
         <span>Team A</span>
         <span class="rowctl">
           <select id="setA1"></select>
@@ -234,6 +247,11 @@
         <button type="button" id="historyBtn" class="ghost small">Ansehen</button>
       </div>
 
+      <div class="row">
+        <span>Statistik &amp; Bestenliste</span>
+        <button type="button" id="statsBtn" class="ghost small">Ansehen</button>
+      </div>
+
       <hr />
       <div class="btnrow">
         <button type="button" id="newGameBtn" class="danger">Neues Spiel</button>
@@ -255,6 +273,42 @@
     </div>
   </dialog>
 
-  <script src="app.js?v=13"></script>
+  <!-- Statistik & Bestenliste -->
+  <dialog id="statsDlg">
+    <div class="settings">
+      <h2>Statistik &amp; Bestenliste</h2>
+      <p id="statsSource" class="muted"></p>
+      <div id="statsList"></div>
+
+      <hr />
+      <h3>Fairer Matchmaker</h3>
+      <p class="muted">Vier Spieler wählen → zwei möglichst gleich starke Teams.</p>
+      <div class="mmgrid">
+        <select id="mm1"></select>
+        <select id="mm2"></select>
+        <select id="mm3"></select>
+        <select id="mm4"></select>
+      </div>
+      <div class="btnrow">
+        <button type="button" id="mmBtn" class="ghost small">Teams vorschlagen</button>
+      </div>
+      <p id="mmResult" class="mmresult"></p>
+
+      <hr />
+      <div class="btnrow">
+        <button type="button" id="statsExport" class="ghost small">Export (JSON)</button>
+        <button type="button" id="statsImport" class="ghost small">Import (JSON)</button>
+        <input type="file" id="statsImportFile" accept="application/json" hidden />
+      </div>
+      <div class="btnrow">
+        <button type="button" id="statsClose" class="primary">Schließen</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Stilles Loop-Audio für die Smartwatch-Mediensteuerung -->
+  <audio id="silentAudio" src="silent.wav" loop preload="auto" playsinline></audio>
+
+  <script src="app.js?v=14"></script>
 </body>
 </html>

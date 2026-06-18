@@ -23,6 +23,8 @@ const DEFAULT_SETTINGS = {
   voiceURI: '',
   sound: true,
   naturalVoice: true,   // vorab erzeugte natürliche Audio-Schnipsel verwenden, wenn vorhanden
+  ringControl: false,   // Bluetooth-Ring (Mausrad/Scroll)
+  watchControl: false,  // Smartwatch über Media Session
   matchBestOf: 1,   // 1 = Einzelspiel, 3 = Best of 3, 5 = Best of 5
   startServer: 'A', // welches Team zuerst aufschlägt
   showStartChooser: true, // Aufschlag-Auswahl beim Spielstart zeigen
@@ -56,13 +58,122 @@ function gamesNeeded() { return settings.matchBestOf > 1 ? Math.ceil(settings.ma
 
 // ---- Verlauf gespielter Spiele ----
 function loadHistory() { try { return JSON.parse(localStorage.getItem(KEY_HISTORY)) || []; } catch (e) { return []; } }
+function parsePlayers(nm) {
+  return String(nm).split('+').map((s) => s.trim()).filter(Boolean);
+}
 function addHistory(entry) {
   entry.ts = Date.now();
   entry.names = { A: teamName('A'), B: teamName('B') };
+  entry.players = { A: parsePlayers(teamName('A')), B: parsePlayers(teamName('B')) };
   let h = loadHistory();
   h.unshift(entry);
-  if (h.length > 50) h = h.slice(0, 50);
+  if (h.length > 200) h = h.slice(0, 200);
   localStorage.setItem(KEY_HISTORY, JSON.stringify(h));
+}
+
+// ---- #5a Statistik (Lesen) + Matchmaker + Export/Import ----
+const MATCHES_URL = 'https://raw.githubusercontent.com/niklashaenel/pickleball-app/main/matches.json';
+let onlineMatches = [];
+async function fetchOnlineMatches() {
+  try {
+    const r = await fetch(MATCHES_URL + '?t=' + Date.now(), { cache: 'no-store' });
+    if (r.ok) { const data = await r.json(); if (Array.isArray(data)) onlineMatches = data; }
+  } catch (e) { /* offline / Datei fehlt noch */ }
+}
+function matchKey(m) { return (m.ts || '') + '|' + (m.names ? m.names.A + '/' + m.names.B : ''); }
+function allMatches() {
+  const seen = new Set(), out = [];
+  onlineMatches.concat(loadHistory()).forEach((m) => {
+    const k = matchKey(m); if (seen.has(k)) return; seen.add(k); out.push(m);
+  });
+  return out;
+}
+function computeStats() {
+  const stats = {};
+  const ensure = (p) => stats[p] || (stats[p] = { player: p, games: 0, wins: 0, diff: 0 });
+  allMatches().forEach((m) => {
+    const pa = (m.players && m.players.A) || parsePlayers(m.names ? m.names.A : '');
+    const pb = (m.players && m.players.B) || parsePlayers(m.names ? m.names.B : '');
+    let da = 0, db = 0;
+    const mm = String(m.score || m.sets || '').match(/(\d+)\D+(\d+)/);
+    if (mm) { da = +mm[1]; db = +mm[2]; }
+    const winA = m.winner === 'A';
+    pa.forEach((p) => { const s = ensure(p); s.games++; if (winA) s.wins++; s.diff += (da - db); });
+    pb.forEach((p) => { const s = ensure(p); s.games++; if (!winA) s.wins++; s.diff += (db - da); });
+  });
+  return Object.values(stats)
+    .map((s) => Object.assign(s, { quote: s.games ? Math.round(100 * s.wins / s.games) : 0 }))
+    .sort((a, b) => b.quote - a.quote || b.wins - a.wins || b.diff - a.diff);
+}
+function renderStats() {
+  const list = computeStats();
+  const total = allMatches().length;
+  $('#statsSource').textContent = (onlineMatches.length ? 'Online + lokal' : 'Lokal') + ': ' + total + ' Spiele';
+  const el = $('#statsList');
+  if (!list.length) { el.innerHTML = '<p class="muted">Noch keine Spiele gespeichert.</p>'; return; }
+  el.innerHTML = list.map((s, i) =>
+    '<div class="stat-row"><span class="stat-rank">' + (i + 1) + '</span>' +
+    '<span><span class="stat-name">' + s.player + '</span><br>' +
+    '<span class="stat-sub">' + s.wins + '/' + s.games + ' Siege · Diff ' + (s.diff >= 0 ? '+' : '') + s.diff + '</span></span>' +
+    '<span class="stat-quote">' + s.quote + '%</span></div>').join('');
+}
+function populateMatchmaker() {
+  const ps = CLUB_PLAYERS.slice().sort((a, b) => a.localeCompare(b, 'de'));
+  ['#mm1', '#mm2', '#mm3', '#mm4'].forEach((id, idx) => {
+    const sel = $(id);
+    if (sel) sel.innerHTML = '<option value="">— Spieler ' + (idx + 1) + '</option>' +
+      ps.map((p) => '<option value="' + p + '">' + p + '</option>').join('');
+  });
+}
+function playerQuote(p) {
+  const s = computeStats().find((x) => x.player === p);
+  return s && s.games ? s.quote : 50; // unbekannt -> 50 %
+}
+function runMatchmaker() {
+  const sel = ['#mm1', '#mm2', '#mm3', '#mm4'].map((id) => $(id).value).filter(Boolean);
+  if (sel.length !== 4 || new Set(sel).size !== 4) {
+    $('#mmResult').textContent = 'Bitte vier verschiedene Spieler wählen.'; return;
+  }
+  const q = {}; sel.forEach((p) => (q[p] = playerQuote(p)));
+  const splits = [[[0, 1], [2, 3]], [[0, 2], [1, 3]], [[0, 3], [1, 2]]];
+  let best = null;
+  splits.forEach((sp) => {
+    const tA = sp[0].map((i) => sel[i]), tB = sp[1].map((i) => sel[i]);
+    const diff = Math.abs((q[tA[0]] + q[tA[1]]) - (q[tB[0]] + q[tB[1]]));
+    if (!best || diff < best.diff) best = { tA, tB, diff };
+  });
+  mmBest = best;
+  $('#mmResult').innerHTML = 'Team A: <b>' + best.tA.join(' + ') + '</b><br>Team B: <b>' + best.tB.join(' + ') +
+    '</b><br><button type="button" id="mmApply" class="ghost small" style="margin-top:.5rem">In Team A/B übernehmen</button>';
+  $('#mmApply').addEventListener('click', () => {
+    settings.names.A = mmBest.tA.slice().sort((a, b) => slug(a).localeCompare(slug(b))).join(' + ');
+    settings.names.B = mmBest.tB.slice().sort((a, b) => slug(a).localeCompare(slug(b))).join(' + ');
+    saveSettings(); render(); $('#statsDlg').close();
+  });
+}
+let mmBest = null;
+function exportMatches() {
+  const data = JSON.stringify(allMatches(), null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'pickleball-matches.json'; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function importMatches(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const arr = JSON.parse(reader.result);
+      if (!Array.isArray(arr)) throw 0;
+      const seen = new Set(), out = [];
+      arr.concat(loadHistory()).forEach((m) => { const k = matchKey(m); if (seen.has(k)) return; seen.add(k); out.push(m); });
+      localStorage.setItem(KEY_HISTORY, JSON.stringify(out.slice(0, 200)));
+      renderStats();
+      flash('Import: ' + arr.length + ' Spiele');
+    } catch (e) { flash('Import fehlgeschlagen'); }
+  };
+  reader.readAsText(file);
 }
 let learning = null; // welcher Tasten-Slot gerade angelernt wird ('A'|'B'|'undo'|null)
 
@@ -144,10 +255,19 @@ function rallyWonBy(team) {
 
   saveGame();
   render();
-  if (event === 'point') popScore(team);
+  if (event === 'point') { popScore(team); flashScore(team); }
   // Tonsignal
   if (game.over) winJingle(); else soundFor(event);
   announce(event);
+}
+
+// Vollflächiger Farb-Blitz in der Team-Farbe (aus Distanz sichtbar)
+function flashScore(team) {
+  const el = document.querySelector('#scoreFlash');
+  if (!el) return;
+  el.classList.remove('flash', 'teamA', 'teamB');
+  void el.offsetWidth; // Animation neu starten
+  el.classList.add('flash', team === 'A' ? 'teamA' : 'teamB');
 }
 
 // Kleine "Plopp"-Animation auf der Punktzahl
@@ -808,9 +928,65 @@ $$('.side').forEach((el) => {
   el.addEventListener('click', () => {
     if ($('#settings').open) return;
     if (settings.tipperMode) return; // im Tipper-Modus zählen nur die Tipp-Flächen
+    if (settings.ringControl && lastPointerType === 'mouse') return; // Ring-Tipp = Wiederholen, nicht zählen
     rallyWonBy(el.dataset.team);
   });
 });
+
+// ---- #1 Ring-/Scroll-Steuerung (Mausrad) + Mittel-Knopf (Maus-Tipp = Wiederholen) ----
+let lastPointerType = 'touch';
+let lastWheel = 0;
+function anyDialogOpen() {
+  return ['#settings', '#statsDlg', '#historyDlg'].some((id) => { const d = $(id); return d && d.open; });
+}
+window.addEventListener('wheel', (e) => {
+  if (!settings.ringControl || anyDialogOpen()) return; // Dialoge scrollbar lassen
+  e.preventDefault();
+  const now = Date.now();
+  if (now - lastWheel < 400) return; // entprellen (ein Klick feuert viele Events)
+  lastWheel = now;
+  ensureAudio();
+  if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) { undo(); return; } // links/rechts-Wisch = Undo
+  if (e.deltaY < 0) rallyWonBy('A');
+  else if (e.deltaY > 0) rallyWonBy('B');
+}, { passive: false });
+
+document.addEventListener('pointerdown', (e) => {
+  lastPointerType = e.pointerType || 'touch';
+  if (settings.ringControl && e.pointerType === 'mouse' && !anyDialogOpen()) {
+    if (e.target.closest('#bar') || e.target.closest('button') || e.target.closest('select') ||
+        e.target.closest('input') || e.target.closest('.tipper')) return;
+    ensureAudio();
+    announce(undefined, true); // Mittel-Knopf des Rings = Stand wiederholen
+  }
+}, true);
+
+// ---- #2 Smartwatch-Steuerung (Media Session) ----
+function startMediaSession() {
+  if (!settings.watchControl) return;
+  const a = $('#silentAudio');
+  if (a) { try { a.volume = 0; if (a.paused) a.play().catch(() => {}); } catch (e) {} }
+  if ('mediaSession' in navigator) {
+    try {
+      if (window.MediaMetadata) navigator.mediaSession.metadata = new MediaMetadata({ title: 'Pickleball', artist: 'Punktezähler' });
+      navigator.mediaSession.setActionHandler('nexttrack', () => { ensureAudio(); rallyWonBy('A'); });
+      navigator.mediaSession.setActionHandler('previoustrack', () => { ensureAudio(); rallyWonBy('B'); });
+      navigator.mediaSession.setActionHandler('play', () => { ensureAudio(); announce(undefined, true); });
+      navigator.mediaSession.setActionHandler('pause', () => { ensureAudio(); announce(undefined, true); });
+      navigator.mediaSession.playbackState = 'playing';
+    } catch (e) {}
+  }
+}
+function stopMediaSession() {
+  const a = $('#silentAudio');
+  if (a) { try { a.pause(); } catch (e) {} }
+  if ('mediaSession' in navigator) {
+    try {
+      ['nexttrack', 'previoustrack', 'play', 'pause'].forEach((x) => navigator.mediaSession.setActionHandler(x, null));
+      navigator.mediaSession.playbackState = 'none';
+    } catch (e) {}
+  }
+}
 
 // ---- Tipper-Modus: Tippen, Ziehen und Kalibrieren ----
 // Im Einrichten-Modus bleibt an jeder Geräte-Tippstelle ein gelber Punkt liegen.
@@ -931,6 +1107,8 @@ function openSettings() {
   $('#setAnnounce').checked = settings.announce;
   $('#setSound').checked = settings.sound;
   $('#setNaturalVoice').checked = settings.naturalVoice;
+  $('#setRing').checked = settings.ringControl;
+  $('#setWatch').checked = settings.watchControl;
   $('#setAnnounceTeam').checked = settings.announceTeam;
   populateVoices();
   $('#setSwap').checked = settings.swapSides;
@@ -960,8 +1138,18 @@ $('#coinTossBtn').addEventListener('click', coinToss);
 $('#historyBtn').addEventListener('click', () => { renderHistory(); document.querySelector('#historyDlg').showModal(); });
 $('#historyClear').addEventListener('click', () => { localStorage.removeItem(KEY_HISTORY); renderHistory(); });
 $('#historyClose').addEventListener('click', () => { document.querySelector('#historyDlg').close(); });
+
+// Statistik-Dialog
+$('#statsBtn').addEventListener('click', async () => { renderStats(); $('#statsDlg').showModal(); await fetchOnlineMatches(); renderStats(); });
+$('#statsClose').addEventListener('click', () => $('#statsDlg').close());
+$('#mmBtn').addEventListener('click', runMatchmaker);
+$('#statsExport').addEventListener('click', exportMatches);
+$('#statsImport').addEventListener('click', () => $('#statsImportFile').click());
+$('#statsImportFile').addEventListener('change', (e) => { if (e.target.files && e.target.files[0]) importMatches(e.target.files[0]); });
 $('#setSound').addEventListener('change', (e) => { settings.sound = e.target.checked; saveSettings(); if (settings.sound) soundFor('point'); });
 $('#setNaturalVoice').addEventListener('change', (e) => { settings.naturalVoice = e.target.checked; saveSettings(); });
+$('#setRing').addEventListener('change', (e) => { settings.ringControl = e.target.checked; saveSettings(); });
+$('#setWatch').addEventListener('change', (e) => { settings.watchControl = e.target.checked; saveSettings(); if (settings.watchControl) startMediaSession(); else stopMediaSession(); });
 $('#setAnnounce').addEventListener('change', (e) => { settings.announce = e.target.checked; saveSettings(); render(); });
 $('#setAnnounceTeam').addEventListener('change', (e) => { settings.announceTeam = e.target.checked; saveSettings(); });
 $('#setVoice').addEventListener('change', (e) => { settings.voiceURI = e.target.value; saveSettings(); speakSample(); });
@@ -1022,6 +1210,7 @@ function primeSpeech() {
     } catch (e) {}
   }
   preloadClips();
+  startMediaSession();
   if ('speechSynthesis' in window) {
     try { speechSynthesis.getVoices(); } catch (e) {}
   }
@@ -1046,6 +1235,8 @@ function init() {
   updateKeyLabels();
   populateVoices();
   populateTeamSelects();
+  populateMatchmaker();
+  fetchOnlineMatches();
   probeClips();
   render();
 }

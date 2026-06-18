@@ -1,11 +1,11 @@
 // Service Worker: macht die App nach dem ersten Laden offline nutzbar.
-const CACHE = 'pickleball-v13';
+const CACHE = 'pickleball-v14';
 const VOICE = [
   'zu', 'seitenwechsel', 'verlaengerung', 'es-geht-bis', 'aufschlag', 'spiel', 'gewinnt',
   'spiel-fuer', 'satzstand', 'match', 'gewinnt-das-match', 'team-a', 'team-b'
 ];
 const ASSETS = [
-  './', './index.html', './styles.css', './app.js', './manifest.json', './icon.svg'
+  './', './index.html', './styles.css', './app.js', './manifest.json', './icon.svg', './silent.wav'
 ].concat(
   Array.from({ length: 31 }, (_, i) => './voice/' + i + '.mp3'),
   VOICE.map((n) => './voice/' + n + '.mp3')

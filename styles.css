@@ -104,8 +104,8 @@ body::before {
 }
 .sideA .score { color: #d6fbff; text-shadow: 0 0 14px var(--cyan), 0 0 40px #00b4ff, 0 0 80px rgba(0,150,255,.7); }
 .sideB .score { color: #fffce0; text-shadow: 0 0 14px var(--gold), 0 0 40px #f5e000, 0 0 80px rgba(220,200,0,.7); }
-@keyframes pop { 0% { transform: scale(1); } 35% { transform: scale(1.16); } 100% { transform: scale(1); } }
-.score.pop { animation: pop .35s cubic-bezier(.2,.8,.3,1.2); }
+@keyframes pop { 0% { transform: scale(1); } 30% { transform: scale(1.38); } 100% { transform: scale(1); } }
+.score.pop { animation: pop .45s cubic-bezier(.2,.8,.3,1.2); }
 
 .serve {
   height: 2.4rem; margin-top: .3rem; z-index: 2;
@@ -235,6 +235,36 @@ button { font-family: var(--font-ui); }
 .hist-date { font-size: .8rem; color: var(--muted); }
 .hist-teams { font-weight: 700; }
 .hist-res { color: var(--accent); font-size: .95rem; }
+
+/* ---- Farb-Blitz bei einem Punkt (aus Distanz sichtbar) ---- */
+#scoreFlash { position: fixed; inset: 0; z-index: 15; pointer-events: none; opacity: 0; }
+#scoreFlash.flash { animation: scoreflash .5s ease-out; }
+@keyframes scoreflash { 0% { opacity: .9; } 100% { opacity: 0; } }
+#scoreFlash.teamA { background: radial-gradient(circle at 30% 50%, rgba(0,229,255,.95), rgba(0,150,255,.35) 70%); }
+#scoreFlash.teamB { background: radial-gradient(circle at 70% 50%, rgba(250,255,0,.95), rgba(245,158,11,.35) 70%); }
+
+/* ---- Statistik & Matchmaker ---- */
+#statsDlg {
+  border: 1.5px solid rgba(0,229,255,.35); border-radius: 1.2rem;
+  background: rgba(8,12,24,.98); color: var(--text); padding: 1.3rem;
+  width: min(94vw, 34rem); max-height: 88vh; box-shadow: 0 0 40px rgba(0,229,255,.2);
+}
+#statsDlg::backdrop { background: rgba(2,4,10,.7); }
+#statsList { max-height: 46vh; overflow: auto; margin: .4rem 0 .8rem; }
+.stat-row {
+  display: grid; grid-template-columns: 1.6rem 1fr auto; gap: .5rem; align-items: center;
+  padding: .45rem .2rem; border-bottom: 1px solid rgba(0,229,255,.12);
+}
+.stat-rank { color: var(--accent); font-weight: 700; font-family: var(--font-display); }
+.stat-name { font-weight: 700; }
+.stat-sub { color: var(--muted); font-size: .82rem; }
+.stat-quote { color: var(--accent); font-weight: 700; text-align: right; }
+.mmgrid { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; margin: .5rem 0; }
+.mmgrid select {
+  background: #05060d; color: var(--text); border: 1.5px solid rgba(0,229,255,.3);
+  border-radius: .6rem; padding: .5rem .6rem; font-size: 1rem; font-family: var(--font-ui); width: 100%;
+}
+.mmresult { color: var(--accent); min-height: 1.2rem; font-weight: 600; }
 .muted { color: var(--muted); font-size: .9rem; }
 .center { text-align: center; }
 a { color: var(--cyan); }
