@@ -322,37 +322,37 @@ a { color: var(--cyan); }
    Design-Stile: Form & Deko (Farben + Schriften kommen aus den Variablen)
    ============================================================ */
 /* Hintergrund-Raster nur im Neon-Look */
-body.design-classic::before, body.design-elegant::before, body.design-minimal::before,
+body.design-klassik::before, body.design-elegant::before, body.design-minimal::before,
 body.design-sport::before, body.design-pastell::before { display: none; }
 /* alle Nicht-Neon-Designs: flacher Hintergrund, keine Seiten-Tönung */
-body.design-classic, body.design-elegant, body.design-minimal,
+body.design-klassik, body.design-elegant, body.design-minimal,
 body.design-sport, body.design-pastell { background: var(--bg); }
-body.design-classic .sideA, body.design-classic .sideB,
+body.design-klassik .sideA, body.design-klassik .sideB,
 body.design-elegant .sideA, body.design-elegant .sideB,
 body.design-minimal .sideA, body.design-minimal .sideB,
 body.design-pastell .sideA, body.design-pastell .sideB { background: none; }
 
 /* ---- Klassik & Elegant: edel, Serifen, dezentes statt Neon-Glühen ---- */
-body.design-classic .sideA .score, body.design-classic .sideB .score,
+body.design-klassik .sideA .score, body.design-klassik .sideB .score,
 body.design-elegant .sideA .score, body.design-elegant .sideB .score {
   color: var(--text); text-shadow: 0 2px 12px rgba(0,0,0,.5);
 }
-body.design-classic .sideA .name, body.design-classic .sideB .name,
+body.design-klassik .sideA .name, body.design-klassik .sideB .name,
 body.design-elegant .sideA .name, body.design-elegant .sideB .name { color: var(--text); text-shadow: none; opacity: .9; }
-body.design-classic .name { font-family: 'Cinzel', serif; letter-spacing: .08em; }
+body.design-klassik .name { font-family: 'Cinzel', serif; letter-spacing: .08em; }
 body.design-elegant .name {
   font-family: 'Great Vibes', cursive; text-transform: none; letter-spacing: 0;
   font-size: clamp(1.5rem, 5.6vw, 3rem); opacity: .96;
 }
-body.design-classic .call, body.design-elegant .call {
+body.design-klassik .call, body.design-elegant .call {
   text-shadow: none; box-shadow: none; background: transparent;
   border: 1px solid var(--line); color: var(--accent); letter-spacing: .2em;
 }
-body.design-classic #court::after, body.design-elegant #court::after {
+body.design-klassik #court::after, body.design-elegant #court::after {
   box-shadow: none; width: 2px; opacity: .55; background: linear-gradient(transparent, var(--gold), transparent);
 }
-body.design-classic .sideA .games, body.design-elegant .sideA .games,
-body.design-classic .sideB .games, body.design-elegant .sideB .games { text-shadow: none; }
+body.design-klassik .sideA .games, body.design-elegant .sideA .games,
+body.design-klassik .sideB .games, body.design-elegant .sideB .games { text-shadow: none; }
 
 /* ---- Minimal: hell, flach, ohne Glühen ---- */
 body.design-minimal { color-scheme: light; }
