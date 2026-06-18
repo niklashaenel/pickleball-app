@@ -957,7 +957,7 @@ updateSwipeLayer();
 //   Mitte/Play-Pause = Stand ansagen
 // Zählen bleibt sofort; ein schneller zweiter Druck (hoch ODER runter) nimmt zurück.
 const DBL_MS = 800; // Zeitfenster für "schnell doppelt" bei hoch/runter
-let lastNextPress = 0, lastPrevPress = 0;
+let lastNextPress = 0, lastPrevPress = 0, lastMiddlePress = 0;
 function onMediaNext() {
   ensureAudio();
   const now = Date.now();
@@ -970,7 +970,15 @@ function onMediaPrev() {
   if (lastPrevPress && now - lastPrevPress < DBL_MS) { lastPrevPress = 0; undo(); } // doppelt = Undo (mit Ton)
   else { lastPrevPress = now; rallyWonBy('B'); }
 }
-function onMediaMiddle() { ensureAudio(); announce(undefined, true); } // Mitte = Stand ansagen
+function onMediaMiddle() {
+  // Mitte = Stand ansagen. Entprellen: schnelle Folge-Tipps (oder Doppel-Signale der Uhr
+  // pro Druck) ignorieren, damit die Ansage nicht ständig neu startet und abbricht.
+  ensureAudio();
+  const now = Date.now();
+  if (now - lastMiddlePress < 1500) return;
+  lastMiddlePress = now;
+  announce(undefined, true);
+}
 function startMediaSession() {
   if (!settings.watchControl) return;
   const a = $('#silentAudio');
