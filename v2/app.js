@@ -1236,6 +1236,27 @@ function stopMediaSession() {
     } catch (e) {}
   }
 }
+// ---- Uhr-Recovery: nach Reconnect/Vordergrund Audio + Mediensteuerung neu scharf schalten ----
+// Behebt NICHT den Bluetooth-Abbruch (Uhr/iOS), beschleunigt aber die Wiederaufnahme:
+// oft reicht dann 1× tippen statt App-Neustart.
+let lastRearm = 0;
+function rearmMediaSession() {
+  if (!settings.watchControl) return;
+  const now = Date.now();
+  if (now - lastRearm < 1500) return; // entprellen (keine Schleife)
+  lastRearm = now;
+  startMediaSession(); // spielt #silentAudio neu ab + setzt Handler + playbackState
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') rearmMediaSession(); });
+window.addEventListener('pageshow', rearmMediaSession);
+window.addEventListener('focus', rearmMediaSession);
+(() => {
+  const a = $('#silentAudio');
+  if (!a) return;
+  const onInterrupt = () => { if (settings.watchControl) setTimeout(rearmMediaSession, 300); };
+  a.addEventListener('pause', onInterrupt);   // iOS pausiert das Audio, wenn die Medienroute wegfällt
+  a.addEventListener('stalled', onInterrupt);
+})();
 
 /* =========================================================================
    Bedien-Buttons + Einstellungen
