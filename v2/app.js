@@ -25,6 +25,7 @@ const DEFAULT_SETTINGS = {
   naturalVoice: true,   // vorab erzeugte natürliche Audio-Schnipsel verwenden, wenn vorhanden
   ringControl: false,   // Bluetooth-Ring (Mausrad/Scroll)
   watchControl: false,  // Smartwatch über Media Session
+  swipeControl: false,  // Wisch-Overlay (Finger): hoch=A, runter=B, seitlich=Undo, Tipp=Wiederholen
   matchBestOf: 1,   // 1 = Einzelspiel, 3 = Best of 3, 5 = Best of 5
   startServer: 'A', // welches Team zuerst aufschlägt
   showStartChooser: true, // Aufschlag-Auswahl beim Spielstart zeigen
@@ -960,11 +961,33 @@ document.addEventListener('pointerdown', (e) => {
   lastPointerType = e.pointerType || 'touch';
   if (settings.ringControl && e.pointerType === 'mouse' && !anyDialogOpen()) {
     if (e.target.closest('#bar') || e.target.closest('button') || e.target.closest('select') ||
-        e.target.closest('input') || e.target.closest('.tipper')) return;
+        e.target.closest('input') || e.target.closest('.tipper') || e.target.closest('#swipeLayer')) return;
     ensureAudio();
     announce(undefined, true); // Mittel-Knopf des Rings = Stand wiederholen
   }
 }, true);
+
+// ---- Wisch-Steuerung (Overlay): hoch=A, runter=B, seitlich=Undo, Tipp=Wiederholen ----
+function updateSwipeLayer() {
+  const l = $('#swipeLayer');
+  if (l) l.classList.toggle('hidden', !settings.swipeControl);
+}
+(() => {
+  const l = $('#swipeLayer');
+  if (!l) return;
+  let sx = 0, sy = 0;
+  l.addEventListener('pointerdown', (e) => { sx = e.clientX; sy = e.clientY; });
+  l.addEventListener('pointerup', (e) => {
+    if (anyDialogOpen()) return;
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    const dist = Math.hypot(dx, dy);
+    ensureAudio();
+    if (dist < 28) { announce(undefined, true); return; }   // Tipp = Stand wiederholen
+    if (Math.abs(dx) > Math.abs(dy)) { undo(); return; }     // seitlich = Undo
+    if (dy < 0) rallyWonBy('A'); else rallyWonBy('B');       // hoch = A, runter = B
+  });
+})();
+updateSwipeLayer();
 
 // ---- #2 Smartwatch-Steuerung (Media Session) ----
 function startMediaSession() {
@@ -1100,6 +1123,7 @@ function openSettings() {
   $('#setNaturalVoice').checked = settings.naturalVoice;
   $('#setRing').checked = settings.ringControl;
   $('#setWatch').checked = settings.watchControl;
+  $('#setSwipe').checked = settings.swipeControl;
   $('#setAnnounceTeam').checked = settings.announceTeam;
   populateVoices();
   $('#setSwap').checked = settings.swapSides;
@@ -1141,6 +1165,7 @@ $('#setSound').addEventListener('change', (e) => { settings.sound = e.target.che
 $('#setNaturalVoice').addEventListener('change', (e) => { settings.naturalVoice = e.target.checked; saveSettings(); });
 $('#setRing').addEventListener('change', (e) => { settings.ringControl = e.target.checked; saveSettings(); });
 $('#setWatch').addEventListener('change', (e) => { settings.watchControl = e.target.checked; saveSettings(); if (settings.watchControl) startMediaSession(); else stopMediaSession(); });
+$('#setSwipe').addEventListener('change', (e) => { settings.swipeControl = e.target.checked; saveSettings(); updateSwipeLayer(); });
 $('#setAnnounce').addEventListener('change', (e) => { settings.announce = e.target.checked; saveSettings(); render(); });
 $('#setAnnounceTeam').addEventListener('change', (e) => { settings.announceTeam = e.target.checked; saveSettings(); });
 $('#setVoice').addEventListener('change', (e) => { settings.voiceURI = e.target.value; saveSettings(); speakSample(); });

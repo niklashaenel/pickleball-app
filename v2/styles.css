@@ -250,6 +250,11 @@ button { font-family: var(--font-ui); }
 
 /* ---- Farb-Blitz bei einem Punkt (aus Distanz sichtbar) ---- */
 #scoreFlash { position: fixed; inset: 0; z-index: 15; pointer-events: none; opacity: 0; }
+
+/* Wisch-Overlay: liegt über dem Spielfeld (unter der Leiste z3 und Dialogen z20),
+   fängt Finger-Wische ab; touch-action:none verhindert das native Scrollen. */
+#swipeLayer { position: fixed; inset: 0; z-index: 2; background: transparent; touch-action: none; }
+#swipeLayer.hidden { display: none; }
 #scoreFlash.flash { animation: scoreflash .5s ease-out; }
 @keyframes scoreflash { 0% { opacity: .9; } 100% { opacity: 0; } }
 #scoreFlash.teamA { background: radial-gradient(circle at 30% 50%, rgba(0,229,255,.95), rgba(0,150,255,.35) 70%); }

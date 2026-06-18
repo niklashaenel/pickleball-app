@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=16" />
+  <link rel="stylesheet" href="styles.css?v=17" />
 </head>
 <body>
   <!-- Vollflächiger Farb-Blitz bei einem Punkt (aus Distanz sichtbar) -->
@@ -47,6 +47,9 @@
       <div class="hint" data-hint="B"></div>
     </section>
   </main>
+
+  <!-- Wisch-Overlay (optional): fängt Finger-Wische ab (hoch=A, runter=B, seitlich=Undo, Tipp=wiederholen) -->
+  <div id="swipeLayer" class="hidden" aria-hidden="true"></div>
 
   <!-- Kurze Rückmeldung (Punkt / Aufschlagwechsel / Seitenaus / Spiel) -->
   <div id="feedback" class="feedback" aria-live="assertive"></div>
@@ -182,7 +185,12 @@
         <span>Smartwatch-Steuerung (Media)</span>
         <input type="checkbox" id="setWatch" />
       </label>
-      <p class="muted">Wisch hoch = Punkt A, runter = Punkt B, Klick = Stand wiederholen. Für die Uhr: als Mediensteuerung koppeln und einmal in der App tippen, damit der Ton startet. <a href="tastentest.html">Diagnose-Seite</a> zeigt, was Ring/Uhr senden.</p>
+
+      <label class="row">
+        <span>Wisch-Steuerung (Finger statt Tippen)</span>
+        <input type="checkbox" id="setSwipe" />
+      </label>
+      <p class="muted">Wisch-Steuerung an: hoch = Punkt A, runter = Punkt B, seitlich = Undo, Tippen = Stand wiederholen (statt Tippen auf die Hälften). Für die Uhr: als Mediensteuerung koppeln und einmal in der App tippen, damit der Ton startet. <a href="tastentest.html">Diagnose-Seite</a> zeigt, was Ring/Uhr senden.</p>
 
       <label class="row">
         <span>Team A</span>
@@ -309,6 +317,6 @@
   <!-- Stilles Loop-Audio für die Smartwatch-Mediensteuerung -->
   <audio id="silentAudio" src="silent.wav" loop preload="auto" playsinline></audio>
 
-  <script src="app.js?v=16"></script>
+  <script src="app.js?v=17"></script>
 </body>
 </html>
