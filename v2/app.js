@@ -38,6 +38,7 @@ const KEYBOARD = { A: 'ArrowLeft', B: 'ArrowRight', undo: 'Backspace', repeat: '
 
 // Vorübergehende Zustände (nicht gespeichert)
 let startChosen = false; // wurde der Startaufschlag für das aktuelle Spiel schon bestätigt?
+let frozen = false;      // Freeze-Sperre: blockiert versehentliches Zählen/Undo
 
 /* ---- Zahlwörter für die deutsche Ansage ---- */
 const WORDS = ['null','eins','zwei','drei','vier','fünf','sechs','sieben','acht','neun',
@@ -221,6 +222,7 @@ function snapshot() { return JSON.parse(JSON.stringify(game)); }
 
 /* Kern: Team `team` hat den Ballwechsel gewonnen */
 function rallyWonBy(team) {
+  if (frozen) return; // Sperre aktiv: nichts zählen
   if (game.over) return;
   history.push(snapshot());
 
@@ -295,6 +297,7 @@ function checkOver() {
 }
 
 function undo() {
+  if (frozen) return; // Sperre aktiv: kein Undo
   if (!history.length) { flash('Nichts rückgängig'); return; }
   game = history.pop();
   saveGame();
@@ -308,6 +311,7 @@ function resetGame() {
   saveMatch();
   saveGame();
   startChosen = false;
+  frozen = false; document.body.classList.remove('frozen'); // Sperre lösen (lautlos)
   hide('winner');
   render();
 }
@@ -640,6 +644,23 @@ function winJingle() {
   beep(1175, 220, 'triangle', 0.28);
 }
 
+// ---- Freeze-Sperre (gegen versehentliches Zählen) ----
+// Töne bewusst klar unterscheidbar: Sperren = absteigend, Entsperren = aufsteigend.
+function freezeTone(locking) {
+  ensureAudio();
+  if (locking) { beep(640, 130, 'square', 0); beep(300, 220, 'square', 0.14); } // ab
+  else { beep(440, 120, 'square', 0); beep(900, 220, 'square', 0.14); }          // auf
+}
+function setFrozen(on) {
+  on = !!on;
+  if (frozen === on) return;
+  frozen = on;
+  document.body.classList.toggle('frozen', frozen);
+  freezeTone(frozen);
+  flash(frozen ? '🔒 Gesperrt' : '🔓 Entsperrt');
+}
+function toggleFreeze() { ensureAudio(); setFrozen(!frozen); }
+
 // ---- Natürliche Audio-Schnipsel (vorab mit edge-tts erzeugt) ----
 const CLIP_KEYS = new Set([
   ...Array.from({ length: 31 }, (_, i) => String(i)),
@@ -920,9 +941,21 @@ function updateSwipeLayer() {
 (() => {
   const l = $('#swipeLayer');
   if (!l) return;
-  let sx = 0, sy = 0;
-  l.addEventListener('pointerdown', (e) => { sx = e.clientX; sy = e.clientY; });
+  let sx = 0, sy = 0, pressTimer = null, longPressed = false;
+  const clearTimer = () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } };
+  l.addEventListener('pointerdown', (e) => {
+    sx = e.clientX; sy = e.clientY; longPressed = false;
+    clearTimer();
+    // Lang drücken (~0,8s ruhig) = Freeze-Sperre umschalten
+    pressTimer = setTimeout(() => { pressTimer = null; longPressed = true; toggleFreeze(); }, 800);
+  });
+  l.addEventListener('pointermove', (e) => {
+    if (pressTimer && Math.hypot(e.clientX - sx, e.clientY - sy) > 14) clearTimer(); // Wisch -> kein Lang-Druck
+  });
+  l.addEventListener('pointercancel', clearTimer);
   l.addEventListener('pointerup', (e) => {
+    clearTimer();
+    if (longPressed) { longPressed = false; return; } // war Lang-Druck (Freeze) -> sonst nichts
     if (anyDialogOpen()) return;
     const dx = e.clientX - sx, dy = e.clientY - sy;
     const dist = Math.hypot(dx, dy);
@@ -933,8 +966,22 @@ function updateSwipeLayer() {
   });
 })();
 updateSwipeLayer();
+// Sperr-Abzeichen antippen entsperrt ebenfalls (Sicherheitsausgang)
+(() => { const b = $('#freezeBadge'); if (b) b.addEventListener('click', () => setFrozen(false)); })();
 
 // ---- #2 Smartwatch-Steuerung (Media Session) ----
+// Play/Pause auf der Uhr: 1× = Stand wiederholen, 2× schnell = Punkt zurück (Undo).
+// (Media Session kann kein "gedrückt halten" melden, daher Doppeldruck.)
+let watchPressTimer = null;
+function watchPlayPause() {
+  ensureAudio();
+  if (watchPressTimer) {                 // zweiter Druck im Zeitfenster -> Undo
+    clearTimeout(watchPressTimer); watchPressTimer = null;
+    undo();
+    return;
+  }
+  watchPressTimer = setTimeout(() => { watchPressTimer = null; announce(undefined, true); }, 600);
+}
 function startMediaSession() {
   if (!settings.watchControl) return;
   const a = $('#silentAudio');
@@ -946,11 +993,11 @@ function startMediaSession() {
       if (window.MediaMetadata) navigator.mediaSession.metadata = new MediaMetadata({ title: 'Pickleball', artist: 'Punktezähler' });
       const toA = () => { ensureAudio(); rallyWonBy('A'); };
       const toB = () => { ensureAudio(); rallyWonBy('B'); };
-      const rep = () => { ensureAudio(); announce(undefined, true); };
       navigator.mediaSession.setActionHandler('nexttrack', toA);
       navigator.mediaSession.setActionHandler('previoustrack', toB);
-      navigator.mediaSession.setActionHandler('play', rep);
-      navigator.mediaSession.setActionHandler('pause', rep);
+      // Play/Pause: einmal = Stand wiederholen, doppelt (schnell) = Punkt zurück (Undo)
+      navigator.mediaSession.setActionHandler('play', watchPlayPause);
+      navigator.mediaSession.setActionHandler('pause', watchPlayPause);
       // Reserve: falls die Uhr Skip- statt Track-Tasten sendet
       try { navigator.mediaSession.setActionHandler('seekforward', toA); } catch (e) {}
       try { navigator.mediaSession.setActionHandler('seekbackward', toB); } catch (e) {}
@@ -1047,7 +1094,7 @@ $('#statsImport').addEventListener('click', () => $('#statsImportFile').click())
 $('#statsImportFile').addEventListener('change', (e) => { if (e.target.files && e.target.files[0]) importMatches(e.target.files[0]); });
 $('#setSound').addEventListener('change', (e) => { settings.sound = e.target.checked; saveSettings(); if (settings.sound) soundFor('point'); });
 $('#setWatch').addEventListener('change', (e) => { settings.watchControl = e.target.checked; saveSettings(); if (settings.watchControl) startMediaSession(); else stopMediaSession(); });
-$('#setSwipe').addEventListener('change', (e) => { settings.swipeControl = e.target.checked; saveSettings(); updateSwipeLayer(); });
+$('#setSwipe').addEventListener('change', (e) => { settings.swipeControl = e.target.checked; saveSettings(); updateSwipeLayer(); if (!settings.swipeControl) { frozen = false; document.body.classList.remove('frozen'); } });
 $('#setAnnounce').addEventListener('change', (e) => { settings.announce = e.target.checked; saveSettings(); render(); });
 $('#setAnnounceTeam').addEventListener('change', (e) => { settings.announceTeam = e.target.checked; saveSettings(); });
 $('#setSwap').addEventListener('change', (e) => { settings.swapSides = e.target.checked; saveSettings(); render(); });

@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=18" />
+  <link rel="stylesheet" href="styles.css?v=19" />
 </head>
 <body>
   <!-- Vollflächiger Farb-Blitz bei einem Punkt (aus Distanz sichtbar) -->
@@ -50,6 +50,9 @@
 
   <!-- Wisch-Overlay (optional): fängt Finger-Wische ab (hoch=A, runter=B, seitlich=Undo, Tipp=wiederholen) -->
   <div id="swipeLayer" class="hidden" aria-hidden="true"></div>
+
+  <!-- Freeze-Sperre: sichtbarer Hinweis, antippen entsperrt ebenfalls -->
+  <button id="freezeBadge" class="freeze-badge" type="button">🔒 Gesperrt<small>lang drücken oder hier tippen zum Entsperren</small></button>
 
   <!-- Kurze Rückmeldung (Punkt / Aufschlagwechsel / Seitenaus / Spiel) -->
   <div id="feedback" class="feedback" aria-live="assertive"></div>
@@ -266,6 +269,6 @@
   <!-- Stilles Loop-Audio für die Smartwatch-Mediensteuerung -->
   <audio id="silentAudio" src="silent.wav" loop preload="auto" playsinline></audio>
 
-  <script src="app.js?v=18"></script>
+  <script src="app.js?v=19"></script>
 </body>
 </html>
