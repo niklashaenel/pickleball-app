@@ -37,30 +37,35 @@ const DEFAULT_SETTINGS = {
 // Feste Tastatur-Kürzel (unsichtbarer Desktop-Komfort): A/B zählen, Undo, Wiederholen
 const KEYBOARD = { A: 'ArrowLeft', B: 'ArrowRight', undo: 'Backspace', repeat: 'Enter' };
 
-/* ---- Farb-Designs (Themes) ---- */
+/* ---- Design-Stile (Farben + Schrift + Form über die body-Klasse design-<id>) ---- */
+const FD = { orbitron: "'Orbitron', system-ui, sans-serif", rajdhani: "'Rajdhani', system-ui, sans-serif",
+  playfair: "'Playfair Display', Georgia, serif", poppins: "'Poppins', system-ui, sans-serif",
+  anton: "'Anton', system-ui, sans-serif", fredoka: "'Fredoka', system-ui, sans-serif" };
 const THEMES = [
-  { id: 'neon',   name: 'Neon',    bg: '#05060d', text: '#eaf6ff', muted: '#8aa6c0', a: '#00e5ff', b: '#fdff2f', accent: '#fdff6a', aRgb: '0,229,255',  bRgb: '250,255,0' },
-  { id: 'sunset', name: 'Sunset',  bg: '#190a14', text: '#ffe9f3', muted: '#c79ab0', a: '#ff4d9d', b: '#ffae3b', accent: '#ffd166', aRgb: '255,77,157', bRgb: '255,174,59' },
-  { id: 'ocean',  name: 'Ozean',   bg: '#04101a', text: '#e6f7ff', muted: '#7fa6bf', a: '#2ce0d6', b: '#4d9bff', accent: '#8fe9ff', aRgb: '44,224,214', bRgb: '77,155,255' },
-  { id: 'forest', name: 'Wald',    bg: '#07140d', text: '#e7fff0', muted: '#8db9a0', a: '#5cff8f', b: '#ffd23f', accent: '#aef7c3', aRgb: '92,255,143', bRgb: '255,210,63' },
-  { id: 'grape',  name: 'Traube',  bg: '#120a1e', text: '#f1e8ff', muted: '#a892c7', a: '#b06bff', b: '#45e0ff', accent: '#d8b4ff', aRgb: '176,107,255', bRgb: '69,224,255' },
-  { id: 'fire',   name: 'Feuer',   bg: '#1a0707', text: '#ffeae0', muted: '#c79a90', a: '#ff5470', b: '#ff9f1c', accent: '#ffd6a0', aRgb: '255,84,112', bRgb: '255,159,28' },
-  { id: 'candy',  name: 'Candy',   bg: '#14091a', text: '#ffe8fb', muted: '#c49ac0', a: '#ff5cce', b: '#29e0c0', accent: '#ffc2ef', aRgb: '255,92,206', bRgb: '41,224,192' },
-  { id: 'mono',   name: 'Mono',    bg: '#0c0e12', text: '#eef3fb', muted: '#90a0b5', a: '#e8f0ff', b: '#9fb3c8', accent: '#cfe0ff', aRgb: '232,240,255', bRgb: '159,179,200' },
-  { id: 'lava',   name: 'Lava',    bg: '#160a05', text: '#ffeede', muted: '#c39d82', a: '#ff7a18', b: '#ffd400', accent: '#ffb056', aRgb: '255,122,24', bRgb: '255,212,0' },
-  { id: 'mint',   name: 'Mint',    bg: '#06140f', text: '#e6fff5', muted: '#84b8a4', a: '#27f5b5', b: '#7af9ff', accent: '#aeffe6', aRgb: '39,245,181', bRgb: '122,249,255' }
+  { id: 'neon', name: 'Neon', bg: '#05060d', text: '#eaf6ff', muted: '#8aa6c0', a: '#00e5ff', b: '#fdff2f', accent: '#fdff6a', aRgb: '0,229,255', bRgb: '250,255,0',
+    fd: FD.orbitron, fu: FD.rajdhani, surface: 'rgba(10,15,28,.98)', surface2: '#05060d', backdrop: 'rgba(2,4,10,.72)', line: 'rgba(0,229,255,.25)' },
+  { id: 'klassik', name: 'Klassik', bg: '#0c3b2e', text: '#f3ead3', muted: '#b7c2a8', a: '#e9c879', b: '#e8a07a', accent: '#e9c879', aRgb: '233,200,121', bRgb: '232,160,122',
+    fd: FD.playfair, fu: FD.poppins, surface: 'rgba(14,46,36,.98)', surface2: '#0a3024', backdrop: 'rgba(4,20,15,.7)', line: 'rgba(233,200,121,.3)' },
+  { id: 'elegant', name: 'Elegant', bg: '#16131a', text: '#ecd9a8', muted: '#b7a98a', a: '#e8c97a', b: '#bda0d8', accent: '#e8c97a', aRgb: '232,201,122', bRgb: '189,160,216',
+    fd: FD.playfair, fu: FD.poppins, surface: 'rgba(28,24,34,.98)', surface2: '#161219', backdrop: 'rgba(8,6,10,.72)', line: 'rgba(232,201,122,.28)' },
+  { id: 'minimal', name: 'Minimal', bg: '#f6f7f5', text: '#1a1c1e', muted: '#6b7177', a: '#2e7bff', b: '#ff7a2e', accent: '#2e7bff', aRgb: '46,123,255', bRgb: '255,122,46',
+    fd: FD.poppins, fu: FD.poppins, surface: '#ffffff', surface2: '#eef0ed', backdrop: 'rgba(20,22,26,.4)', line: 'rgba(20,30,40,.16)' },
+  { id: 'sport', name: 'Sport', bg: '#0a0a0d', text: '#f5f6f8', muted: '#8a8f99', a: '#ff3b46', b: '#2e8bff', accent: '#ffd23f', aRgb: '255,59,70', bRgb: '46,139,255',
+    fd: FD.anton, fu: FD.poppins, surface: 'rgba(18,18,22,.98)', surface2: '#101014', backdrop: 'rgba(0,0,0,.72)', line: 'rgba(255,255,255,.16)' },
+  { id: 'pastell', name: 'Pastell', bg: '#fff5f0', text: '#5b4a52', muted: '#a98f99', a: '#ff7d97', b: '#34bca8', accent: '#d4537e', aRgb: '255,125,151', bRgb: '52,188,168',
+    fd: FD.fredoka, fu: FD.fredoka, surface: '#fffaf7', surface2: '#fdeee8', backdrop: 'rgba(80,50,60,.34)', line: 'rgba(150,90,110,.2)' }
 ];
 function applyTheme(id) {
   const t = THEMES.find((x) => x.id === id) || THEMES[0];
   const r = document.documentElement.style;
-  r.setProperty('--bg', t.bg);
-  r.setProperty('--text', t.text);
-  r.setProperty('--muted', t.muted);
-  r.setProperty('--cyan', t.a);
-  r.setProperty('--gold', t.b);
-  r.setProperty('--accent', t.accent);
-  r.setProperty('--cyan-rgb', t.aRgb);
-  r.setProperty('--gold-rgb', t.bRgb);
+  r.setProperty('--bg', t.bg); r.setProperty('--text', t.text); r.setProperty('--muted', t.muted);
+  r.setProperty('--cyan', t.a); r.setProperty('--gold', t.b); r.setProperty('--accent', t.accent);
+  r.setProperty('--cyan-rgb', t.aRgb); r.setProperty('--gold-rgb', t.bRgb);
+  r.setProperty('--surface', t.surface); r.setProperty('--surface-2', t.surface2);
+  r.setProperty('--backdrop', t.backdrop); r.setProperty('--line', t.line);
+  r.setProperty('--font-display', t.fd); r.setProperty('--font-ui', t.fu);
+  const b = document.body;
+  if (b) { b.className = b.className.replace(/\bdesign-\S+/g, '').trim(); b.classList.add('design-' + t.id); }
   document.querySelectorAll('.swatch').forEach((s) => s.classList.toggle('active', s.dataset.theme === t.id));
 }
 function buildThemeGrid() {
@@ -68,7 +73,7 @@ function buildThemeGrid() {
   if (!grid) return;
   grid.innerHTML = THEMES.map((t) =>
     '<button type="button" class="swatch" data-theme="' + t.id + '" title="' + t.name +
-    '" style="--sw-bg:' + t.bg + ';--sw-a:' + t.a + ';--sw-b:' + t.b + '">' +
+    '" style="--sw-bg:' + t.bg + ';--sw-a:' + t.a + ';--sw-b:' + t.b + ';--sw-text:' + t.text + '">' +
     '<span class="sw-prev"></span><span class="sw-name">' + t.name + '</span></button>').join('');
   grid.querySelectorAll('.swatch').forEach((s) => s.addEventListener('click', () => {
     settings.theme = s.dataset.theme; saveSettings(); applyTheme(settings.theme);
