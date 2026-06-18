@@ -296,13 +296,16 @@ function checkOver() {
   }
 }
 
-function undo() {
-  if (frozen) return; // Sperre aktiv: kein Undo
-  if (!history.length) { flash('Nichts rückgängig'); return; }
+function doUndo(silent) {
+  if (frozen) return false; // Sperre aktiv: kein Undo
+  if (!history.length) { if (!silent) flash('Nichts rückgängig'); return false; }
   game = history.pop();
+  if (!silent) undoTone(); // kleiner Bestätigungston beim Zurücknehmen
   saveGame();
   render();
+  return true;
 }
+function undo() { doUndo(false); }
 
 function resetGame() {
   history = [];
@@ -660,6 +663,8 @@ function setFrozen(on) {
   flash(frozen ? '🔒 Gesperrt' : '🔓 Entsperrt');
 }
 function toggleFreeze() { ensureAudio(); setFrozen(!frozen); }
+// Kurzer Bestätigungston beim Zurücknehmen eines Punkts (klar erkennbar, eigenständig)
+function undoTone() { ensureAudio(); beep(440, 90, 'sine', 0); beep(300, 130, 'sine', 0.07); }
 
 // ---- Natürliche Audio-Schnipsel (vorab mit edge-tts erzeugt) ----
 const CLIP_KEYS = new Set([
@@ -969,18 +974,30 @@ updateSwipeLayer();
 // Sperr-Abzeichen antippen entsperrt ebenfalls (Sicherheitsausgang)
 (() => { const b = $('#freezeBadge'); if (b) b.addEventListener('click', () => setFrozen(false)); })();
 
-// ---- #2 Smartwatch-Steuerung (Media Session) ----
-// Play/Pause auf der Uhr: 1× = Stand wiederholen, 2× schnell = Punkt zurück (Undo).
-// (Media Session kann kein "gedrückt halten" melden, daher Doppeldruck.)
-let watchPressTimer = null;
-function watchPlayPause() {
+// ---- #2 Smartwatch-/Ring-Steuerung (Media Session) ----
+// Ring UND Uhr senden dieselben Media-Events (nicht unterscheidbar):
+//   hoch/next   1× = Punkt A,  2× schnell = Punkt zurück (Undo, mit Ton)
+//   runter/prev 1× = Punkt B,  2× schnell = Sperre an/aus (mit Signalton)
+//   Mitte/Play-Pause 1× = Stand ansagen, 2× = Sperre an/aus
+// Zählen bleibt sofort; ein schneller zweiter Druck nimmt es zurück bzw. sperrt.
+const DBL_MS = 800; // Zeitfenster für "schnell doppelt" bei hoch/runter
+let lastNextPress = 0, lastPrevPress = 0, middleTimer = null;
+function onMediaNext() {
   ensureAudio();
-  if (watchPressTimer) {                 // zweiter Druck im Zeitfenster -> Undo
-    clearTimeout(watchPressTimer); watchPressTimer = null;
-    undo();
-    return;
-  }
-  watchPressTimer = setTimeout(() => { watchPressTimer = null; announce(undefined, true); }, 600);
+  const now = Date.now();
+  if (lastNextPress && now - lastNextPress < DBL_MS) { lastNextPress = 0; undo(); }   // doppelt = Undo (mit Ton)
+  else { lastNextPress = now; rallyWonBy('A'); }
+}
+function onMediaPrev() {
+  ensureAudio();
+  const now = Date.now();
+  if (lastPrevPress && now - lastPrevPress < DBL_MS) { lastPrevPress = 0; doUndo(true); toggleFreeze(); } // doppelt = Sperre
+  else { lastPrevPress = now; rallyWonBy('B'); }
+}
+function onMediaMiddle() {  // Play/Pause: kurz warten -> 1× ansagen, 2× sperren
+  ensureAudio();
+  if (middleTimer) { clearTimeout(middleTimer); middleTimer = null; toggleFreeze(); return; }
+  middleTimer = setTimeout(() => { middleTimer = null; announce(undefined, true); }, 600);
 }
 function startMediaSession() {
   if (!settings.watchControl) return;
@@ -991,16 +1008,13 @@ function startMediaSession() {
   if ('mediaSession' in navigator) {
     try {
       if (window.MediaMetadata) navigator.mediaSession.metadata = new MediaMetadata({ title: 'Pickleball', artist: 'Punktezähler' });
-      const toA = () => { ensureAudio(); rallyWonBy('A'); };
-      const toB = () => { ensureAudio(); rallyWonBy('B'); };
-      navigator.mediaSession.setActionHandler('nexttrack', toA);
-      navigator.mediaSession.setActionHandler('previoustrack', toB);
-      // Play/Pause: einmal = Stand wiederholen, doppelt (schnell) = Punkt zurück (Undo)
-      navigator.mediaSession.setActionHandler('play', watchPlayPause);
-      navigator.mediaSession.setActionHandler('pause', watchPlayPause);
+      navigator.mediaSession.setActionHandler('nexttrack', onMediaNext);
+      navigator.mediaSession.setActionHandler('previoustrack', onMediaPrev);
+      navigator.mediaSession.setActionHandler('play', onMediaMiddle);
+      navigator.mediaSession.setActionHandler('pause', onMediaMiddle);
       // Reserve: falls die Uhr Skip- statt Track-Tasten sendet
-      try { navigator.mediaSession.setActionHandler('seekforward', toA); } catch (e) {}
-      try { navigator.mediaSession.setActionHandler('seekbackward', toB); } catch (e) {}
+      try { navigator.mediaSession.setActionHandler('seekforward', onMediaNext); } catch (e) {}
+      try { navigator.mediaSession.setActionHandler('seekbackward', onMediaPrev); } catch (e) {}
       navigator.mediaSession.playbackState = 'playing';
     } catch (e) {}
   }
