@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <title>Pickleball Punktezähler</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=15" />
+</head>
+<body>
+  <!-- Vollflächiger Farb-Blitz bei einem Punkt (aus Distanz sichtbar) -->
+  <div id="scoreFlash"></div>
+
+  <!-- Kopfzeile: Undo, offizieller Spielstand-Ruf, Menü -->
+  <header id="bar">
+    <button id="undoBtn" class="barbtn" title="Rückgängig" aria-label="Rückgängig">↩︎</button>
+    <div id="call" class="call" aria-live="polite">0&nbsp;0&nbsp;2</div>
+    <div class="bar-right">
+      <button id="repeatBtn" class="barbtn" title="Stand wiederholen" aria-label="Stand wiederholen">🔁</button>
+      <button id="muteBtn" class="barbtn" title="Ansage an/aus" aria-label="Ansage an/aus">🔊</button>
+      <button id="menuBtn" class="barbtn" title="Einstellungen" aria-label="Einstellungen">⚙︎</button>
+    </div>
+  </header>
+
+  <!-- Spielfeld: zwei tippbare Hälften = "diese Seite hat den Ballwechsel gewonnen" -->
+  <main id="court">
+    <section class="side sideA" data-team="A">
+      <div class="name" data-name="A">Team A</div>
+      <div class="games" data-games="A"></div>
+      <div class="score" data-score="A">0</div>
+      <div class="serve" data-serve="A"><span class="ball">🎾</span><span class="srvnum" data-srvnum="A">2</span></div>
+      <div class="hint" data-hint="A"></div>
+    </section>
+    <section class="side sideB" data-team="B">
+      <div class="name" data-name="B">Team B</div>
+      <div class="games" data-games="B"></div>
+      <div class="score" data-score="B">0</div>
+      <div class="serve" data-serve="B"><span class="ball">🎾</span><span class="srvnum" data-srvnum="B">1</span></div>
+      <div class="hint" data-hint="B"></div>
+    </section>
+  </main>
+
+  <!-- Kurze Rückmeldung (Punkt / Aufschlagwechsel / Seitenaus / Spiel) -->
+  <div id="feedback" class="feedback" aria-live="assertive"></div>
+
+  <!-- Tipper-Modus: zwei frei platzierbare Tipp-Flächen für einen mechanischen Seitenwender -->
+  <div id="tippers" class="tippers hidden">
+    <button class="tipper tipperA" id="tipperA" data-team="A">A</button>
+    <button class="tipper tipperB" id="tipperB" data-team="B">B</button>
+  </div>
+  <div id="tapMarkers" class="tap-markers"></div>
+
+  <!-- Erst-Hilfe (einmalig) -->
+  <div id="intro" class="overlay hidden">
+    <div class="card">
+      <h2>🎾 So funktioniert's</h2>
+      <p>Stell das Gerät gut sichtbar neben das Feld.</p>
+      <p><strong>Tippe (oder klick per Funkknopf) nach jedem Ballwechsel auf die Seite, die gewonnen hat.</strong> Die App rechnet automatisch aus, ob das ein Punkt, ein Aufschlagwechsel oder ein Seitenaus ist – und sagt den Stand an.</p>
+      <p>Oben steht der offizielle Ruf (z.&nbsp;B. „0&nbsp;0&nbsp;2"). Mit <strong>↩︎</strong> machst du einen Fehler rückgängig, mit <strong>⚙︎</strong> öffnest du die Einstellungen (dort auch den Funkknopf anlernen).</p>
+      <button id="introOk" class="primary">Los geht's</button>
+    </div>
+  </div>
+
+  <!-- Spielende-Banner -->
+  <div id="winner" class="overlay hidden">
+    <div class="card">
+      <h2 id="winnerText">Spiel!</h2>
+      <button id="winnerNew" class="primary">Neues Spiel</button>
+      <button id="winnerClose" class="ghost">Weiterzählen</button>
+    </div>
+  </div>
+
+  <!-- Start-Aufschlag wählen (zu Spielbeginn, direkt auf dem Bild) -->
+  <div id="startServe" class="overlay hidden">
+    <div class="card">
+      <h2>🎾 Wer beginnt mit Aufschlag?</h2>
+      <div class="startbtns">
+        <button id="ssA" class="startteam">Team A</button>
+        <button id="ssB" class="startteam">Team B</button>
+      </div>
+      <button id="ssToss" class="ghost">🪙 Münzwurf</button>
+      <button id="ssStart" class="primary">Start</button>
+    </div>
+  </div>
+
+  <!-- Einstellungen -->
+  <dialog id="settings">
+    <form method="dialog" class="settings">
+      <h2>Einstellungen</h2>
+
+      <label class="row">
+        <span>Spielform</span>
+        <select id="setMode">
+          <option value="doubles">Doppel (3 Zahlen)</option>
+          <option value="singles">Einzel (2 Zahlen)</option>
+        </select>
+      </label>
+
+      <label class="row">
+        <span>Spiel bis</span>
+        <select id="setTarget">
+          <option value="11">11 Punkte</option>
+          <option value="15">15 Punkte</option>
+          <option value="21">21 Punkte</option>
+        </select>
+      </label>
+
+      <label class="row">
+        <span>2 Punkte Vorsprung nötig</span>
+        <input type="checkbox" id="setWinBy2" />
+      </label>
+
+      <label class="row">
+        <span>Match</span>
+        <select id="setMatch">
+          <option value="1">Einzelspiel</option>
+          <option value="3">Best of 3</option>
+          <option value="5">Best of 5</option>
+        </select>
+      </label>
+
+      <div class="row">
+        <span>Startaufschlag</span>
+        <span class="rowctl">
+          <select id="setStartServer">
+            <option value="A">Team A</option>
+            <option value="B">Team B</option>
+          </select>
+          <button type="button" id="coinTossBtn" class="ghost small">🪙 Los</button>
+        </span>
+      </div>
+
+      <label class="row">
+        <span>Aufschlag-Auswahl beim Start zeigen</span>
+        <input type="checkbox" id="setStartChooser" />
+      </label>
+
+      <label class="row">
+        <span>Spielstand vorlesen</span>
+        <input type="checkbox" id="setAnnounce" />
+      </label>
+
+      <label class="row">
+        <span>Tonsignal beim Punkt</span>
+        <input type="checkbox" id="setSound" />
+      </label>
+
+      <label class="row">
+        <span>Natürliche Stimme (Audio)</span>
+        <input type="checkbox" id="setNaturalVoice" />
+      </label>
+
+      <label class="row">
+        <span>Bei Seitenwechsel Team ansagen</span>
+        <input type="checkbox" id="setAnnounceTeam" />
+      </label>
+
+      <label class="row">
+        <span>Stimme</span>
+        <select id="setVoice"><option value="">(automatisch)</option></select>
+      </label>
+
+      <label class="row">
+        <span>Seiten tauschen (Team A rechts)</span>
+        <input type="checkbox" id="setSwap" />
+      </label>
+
+      <label class="row">
+        <span>Ring-/Scroll-Steuerung <em class="onlyandroid">(nur Android)</em></span>
+        <input type="checkbox" id="setRing" />
+      </label>
+
+      <label class="row">
+        <span>Smartwatch-Steuerung (Media) <em class="onlyandroid">(nur Android)</em></span>
+        <input type="checkbox" id="setWatch" />
+      </label>
+      <p class="muted">Auf dem iPhone leitet iOS diese Befehle nicht an Web-Apps weiter – dort zählst du per Tippen auf die zwei Bildschirmhälften (oder den Tipper-Modus unten).</p>
+
+      <label class="row">
+        <span>Team A</span>
+        <span class="rowctl">
+          <select id="setA1"></select>
+          <select id="setA2"></select>
+        </span>
+      </label>
+
+      <label class="row">
+        <span>Team B</span>
+        <span class="rowctl">
+          <select id="setB1"></select>
+          <select id="setB2"></select>
+        </span>
+      </label>
+
+      <hr />
+      <h3>Tipper-Modus (iPhone + Seitenwender)</h3>
+      <p class="muted">Zwei Tipp-Flächen, die du genau dorthin schiebst, wo dein Seitenwender aufs Display tippt (vorwärts/rückwärts).</p>
+      <label class="row">
+        <span>Tipper-Modus an</span>
+        <input type="checkbox" id="setTipper" />
+      </label>
+      <label class="row">
+        <span>Einrichten (Flächen verschieben)</span>
+        <input type="checkbox" id="setTipperSetup" />
+      </label>
+      <p class="muted">Im Einrichten-Modus: Gerät auslösen → gelber Punkt zeigt, wo es tippt → die passende Fläche (A/B) genau dorthin ziehen. Danach Einrichten wieder aus.</p>
+
+      <hr />
+      <h3>Funkknopf (Klicker)</h3>
+      <p class="muted">Drück „Anlernen" und dann den gewünschten Knopf am Klicker. Die App merkt sich die Taste.</p>
+      <div class="row">
+        <span>Taste für „Team A gewann" <code data-keylabel="A">—</code></span>
+        <button type="button" class="learn" data-learn="A">Anlernen</button>
+      </div>
+      <div class="row">
+        <span>Taste für „Team B gewann" <code data-keylabel="B">—</code></span>
+        <button type="button" class="learn" data-learn="B">Anlernen</button>
+      </div>
+      <div class="row">
+        <span>Taste für „Rückgängig" <code data-keylabel="undo">—</code></span>
+        <button type="button" class="learn" data-learn="undo">Anlernen</button>
+      </div>
+      <div class="row">
+        <span>Taste für „Stand wiederholen" <code data-keylabel="repeat">—</code></span>
+        <button type="button" class="learn" data-learn="repeat">Anlernen</button>
+      </div>
+      <p id="learnStatus" class="learn-status"></p>
+
+      <hr />
+      <h3>Manuell korrigieren</h3>
+      <div class="btnrow">
+        <button type="button" id="flipServe" class="ghost">Aufschlag wechseln</button>
+        <button type="button" id="flipServer" class="ghost">Server 1/2</button>
+      </div>
+
+      <hr />
+      <div class="row">
+        <span>Verlauf gespielter Spiele</span>
+        <button type="button" id="historyBtn" class="ghost small">Ansehen</button>
+      </div>
+
+      <div class="row">
+        <span>Statistik &amp; Bestenliste</span>
+        <button type="button" id="statsBtn" class="ghost small">Ansehen</button>
+      </div>
+
+      <hr />
+      <div class="btnrow">
+        <button type="button" id="newGameBtn" class="danger">Neues Spiel</button>
+        <button value="ok" class="primary">Fertig</button>
+      </div>
+      <p class="muted center"><a href="tastentest.html">Klicker-Testseite öffnen</a></p>
+    </form>
+  </dialog>
+
+  <!-- Verlauf -->
+  <dialog id="historyDlg">
+    <div class="settings">
+      <h2>Verlauf</h2>
+      <div id="historyList"></div>
+      <div class="btnrow">
+        <button type="button" id="historyClear" class="danger">Verlauf löschen</button>
+        <button type="button" id="historyClose" class="primary">Schließen</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Statistik & Bestenliste -->
+  <dialog id="statsDlg">
+    <div class="settings">
+      <h2>Statistik &amp; Bestenliste</h2>
+      <p id="statsSource" class="muted"></p>
+      <div id="statsList"></div>
+
+      <hr />
+      <h3>Fairer Matchmaker</h3>
+      <p class="muted">Vier Spieler wählen → zwei möglichst gleich starke Teams.</p>
+      <div class="mmgrid">
+        <select id="mm1"></select>
+        <select id="mm2"></select>
+        <select id="mm3"></select>
+        <select id="mm4"></select>
+      </div>
+      <div class="btnrow">
+        <button type="button" id="mmBtn" class="ghost small">Teams vorschlagen</button>
+      </div>
+      <p id="mmResult" class="mmresult"></p>
+
+      <hr />
+      <div class="btnrow">
+        <button type="button" id="statsExport" class="ghost small">Export (JSON)</button>
+        <button type="button" id="statsImport" class="ghost small">Import (JSON)</button>
+        <input type="file" id="statsImportFile" accept="application/json" hidden />
+      </div>
+      <div class="btnrow">
+        <button type="button" id="statsClose" class="primary">Schließen</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Stilles Loop-Audio für die Smartwatch-Mediensteuerung -->
+  <audio id="silentAudio" src="silent.wav" loop preload="auto" playsinline></audio>
+
+  <script src="app.js?v=15"></script>
+</body>
+</html>
