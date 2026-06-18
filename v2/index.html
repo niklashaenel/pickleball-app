@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=17" />
+  <link rel="stylesheet" href="styles.css?v=18" />
 </head>
 <body>
   <!-- Vollflächiger Farb-Blitz bei einem Punkt (aus Distanz sichtbar) -->
@@ -54,20 +54,13 @@
   <!-- Kurze Rückmeldung (Punkt / Aufschlagwechsel / Seitenaus / Spiel) -->
   <div id="feedback" class="feedback" aria-live="assertive"></div>
 
-  <!-- Tipper-Modus: zwei frei platzierbare Tipp-Flächen für einen mechanischen Seitenwender -->
-  <div id="tippers" class="tippers hidden">
-    <button class="tipper tipperA" id="tipperA" data-team="A">A</button>
-    <button class="tipper tipperB" id="tipperB" data-team="B">B</button>
-  </div>
-  <div id="tapMarkers" class="tap-markers"></div>
-
   <!-- Erst-Hilfe (einmalig) -->
   <div id="intro" class="overlay hidden">
     <div class="card">
       <h2>🎾 So funktioniert's</h2>
       <p>Stell das Gerät gut sichtbar neben das Feld.</p>
       <p><strong>Tippe (oder klick per Funkknopf) nach jedem Ballwechsel auf die Seite, die gewonnen hat.</strong> Die App rechnet automatisch aus, ob das ein Punkt, ein Aufschlagwechsel oder ein Seitenaus ist – und sagt den Stand an.</p>
-      <p>Oben steht der offizielle Ruf (z.&nbsp;B. „0&nbsp;0&nbsp;2"). Mit <strong>↩︎</strong> machst du einen Fehler rückgängig, mit <strong>⚙︎</strong> öffnest du die Einstellungen (dort auch den Funkknopf anlernen).</p>
+      <p>Oben steht der offizielle Ruf (z.&nbsp;B. „0&nbsp;0&nbsp;2"). Mit <strong>↩︎</strong> machst du einen Fehler rückgängig, mit <strong>⚙︎</strong> öffnest du die Einstellungen.</p>
       <button id="introOk" class="primary">Los geht's</button>
     </div>
   </div>
@@ -99,6 +92,7 @@
     <form method="dialog" class="settings">
       <h2>Einstellungen</h2>
 
+      <h3 class="setgroup">Spiel</h3>
       <label class="row">
         <span>Spielform</span>
         <select id="setMode">
@@ -146,19 +140,10 @@
         <input type="checkbox" id="setStartChooser" />
       </label>
 
+      <h3 class="setgroup">Ansage</h3>
       <label class="row">
         <span>Spielstand vorlesen</span>
         <input type="checkbox" id="setAnnounce" />
-      </label>
-
-      <label class="row">
-        <span>Tonsignal beim Punkt</span>
-        <input type="checkbox" id="setSound" />
-      </label>
-
-      <label class="row">
-        <span>Natürliche Stimme (Audio)</span>
-        <input type="checkbox" id="setNaturalVoice" />
       </label>
 
       <label class="row">
@@ -167,20 +152,11 @@
       </label>
 
       <label class="row">
-        <span>Stimme</span>
-        <select id="setVoice"><option value="">(automatisch)</option></select>
+        <span>Tonsignal beim Punkt</span>
+        <input type="checkbox" id="setSound" />
       </label>
 
-      <label class="row">
-        <span>Seiten tauschen (Team A rechts)</span>
-        <input type="checkbox" id="setSwap" />
-      </label>
-
-      <label class="row">
-        <span>Ring-/Scroll-Steuerung</span>
-        <input type="checkbox" id="setRing" />
-      </label>
-
+      <h3 class="setgroup">Steuerung</h3>
       <label class="row">
         <span>Smartwatch-Steuerung (Media)</span>
         <input type="checkbox" id="setWatch" />
@@ -190,8 +166,14 @@
         <span>Wisch-Steuerung (Finger statt Tippen)</span>
         <input type="checkbox" id="setSwipe" />
       </label>
-      <p class="muted">Wisch-Steuerung an: hoch = Punkt A, runter = Punkt B, seitlich = Undo, Tippen = Stand wiederholen (statt Tippen auf die Hälften). Für die Uhr: als Mediensteuerung koppeln und einmal in der App tippen, damit der Ton startet. <a href="tastentest.html">Diagnose-Seite</a> zeigt, was Ring/Uhr senden.</p>
 
+      <label class="row">
+        <span>Seiten tauschen (Team A rechts)</span>
+        <input type="checkbox" id="setSwap" />
+      </label>
+      <p class="muted">Eingabe: <strong>Tippen</strong> auf die Hälften zählt A/B. <strong>Wisch-Steuerung</strong> an → hoch = Punkt A, runter = Punkt B, seitlich = Undo, Tippen = Stand wiederholen. <strong>Smartwatch</strong>: als Mediensteuerung koppeln und einmal in der App tippen, damit der Ton startet. <a href="tastentest.html">Diagnose-Seite</a> zeigt, was Ring/Uhr senden.</p>
+
+      <h3 class="setgroup">Teams</h3>
       <label class="row">
         <span>Team A</span>
         <span class="rowctl">
@@ -208,48 +190,15 @@
         </span>
       </label>
 
-      <hr />
-      <h3>Tipper-Modus (iPhone + Seitenwender)</h3>
-      <p class="muted">Zwei Tipp-Flächen, die du genau dorthin schiebst, wo dein Seitenwender aufs Display tippt (vorwärts/rückwärts).</p>
-      <label class="row">
-        <span>Tipper-Modus an</span>
-        <input type="checkbox" id="setTipper" />
-      </label>
-      <label class="row">
-        <span>Einrichten (Flächen verschieben)</span>
-        <input type="checkbox" id="setTipperSetup" />
-      </label>
-      <p class="muted">Im Einrichten-Modus: Gerät auslösen → gelber Punkt zeigt, wo es tippt → die passende Fläche (A/B) genau dorthin ziehen. Danach Einrichten wieder aus.</p>
+      <details class="setdetails">
+        <summary>Manuell korrigieren</summary>
+        <div class="btnrow">
+          <button type="button" id="flipServe" class="ghost">Aufschlag wechseln</button>
+          <button type="button" id="flipServer" class="ghost">Server 1/2</button>
+        </div>
+      </details>
 
-      <hr />
-      <h3>Funkknopf (Klicker)</h3>
-      <p class="muted">Drück „Anlernen" und dann den gewünschten Knopf am Klicker. Die App merkt sich die Taste.</p>
-      <div class="row">
-        <span>Taste für „Team A gewann" <code data-keylabel="A">—</code></span>
-        <button type="button" class="learn" data-learn="A">Anlernen</button>
-      </div>
-      <div class="row">
-        <span>Taste für „Team B gewann" <code data-keylabel="B">—</code></span>
-        <button type="button" class="learn" data-learn="B">Anlernen</button>
-      </div>
-      <div class="row">
-        <span>Taste für „Rückgängig" <code data-keylabel="undo">—</code></span>
-        <button type="button" class="learn" data-learn="undo">Anlernen</button>
-      </div>
-      <div class="row">
-        <span>Taste für „Stand wiederholen" <code data-keylabel="repeat">—</code></span>
-        <button type="button" class="learn" data-learn="repeat">Anlernen</button>
-      </div>
-      <p id="learnStatus" class="learn-status"></p>
-
-      <hr />
-      <h3>Manuell korrigieren</h3>
-      <div class="btnrow">
-        <button type="button" id="flipServe" class="ghost">Aufschlag wechseln</button>
-        <button type="button" id="flipServer" class="ghost">Server 1/2</button>
-      </div>
-
-      <hr />
+      <h3 class="setgroup">Daten</h3>
       <div class="row">
         <span>Verlauf gespielter Spiele</span>
         <button type="button" id="historyBtn" class="ghost small">Ansehen</button>
@@ -265,7 +214,7 @@
         <button type="button" id="newGameBtn" class="danger">Neues Spiel</button>
         <button value="ok" class="primary">Fertig</button>
       </div>
-      <p class="muted center"><a href="tastentest.html">Klicker-Testseite öffnen</a></p>
+      <p class="muted center"><a href="tastentest.html">Diagnose-Seite öffnen</a></p>
     </form>
   </dialog>
 
@@ -317,6 +266,6 @@
   <!-- Stilles Loop-Audio für die Smartwatch-Mediensteuerung -->
   <audio id="silentAudio" src="silent.wav" loop preload="auto" playsinline></audio>
 
-  <script src="app.js?v=17"></script>
+  <script src="app.js?v=18"></script>
 </body>
 </html>

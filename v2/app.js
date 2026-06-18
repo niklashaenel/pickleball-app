@@ -30,14 +30,13 @@ const DEFAULT_SETTINGS = {
   startServer: 'A', // welches Team zuerst aufschlägt
   showStartChooser: true, // Aufschlag-Auswahl beim Spielstart zeigen
   swapSides: false,
-  tipperMode: false,
-  tippers: { A: { x: 16, y: 55 }, B: { x: 84, y: 55 } }, // Positionen in % der Bildschirmgröße
-  names: { A: 'Team A', B: 'Team B' },
-  keys: { A: 'ArrowLeft', B: 'ArrowRight', undo: 'Backspace', repeat: 'Enter' } // Standard für Tastatur-Test
+  names: { A: 'Team A', B: 'Team B' }
 };
 
+// Feste Tastatur-Kürzel (unsichtbarer Desktop-Komfort): A/B zählen, Undo, Wiederholen
+const KEYBOARD = { A: 'ArrowLeft', B: 'ArrowRight', undo: 'Backspace', repeat: 'Enter' };
+
 // Vorübergehende Zustände (nicht gespeichert)
-let tipperSetup = false;
 let startChosen = false; // wurde der Startaufschlag für das aktuelle Spiel schon bestätigt?
 
 /* ---- Zahlwörter für die deutsche Ansage ---- */
@@ -176,7 +175,6 @@ function importMatches(file) {
   };
   reader.readAsText(file);
 }
-let learning = null; // welcher Tasten-Slot gerade angelernt wird ('A'|'B'|'undo'|null)
 
 /* =========================================================================
    Persistenz
@@ -186,14 +184,14 @@ function loadSettings() {
   try {
     const raw = JSON.parse(localStorage.getItem(KEY_SETTINGS));
     if (raw) s = Object.assign({}, DEFAULT_SETTINGS, raw,
-      { names:   Object.assign({}, DEFAULT_SETTINGS.names,   raw.names),
-        keys:    Object.assign({}, DEFAULT_SETTINGS.keys,    raw.keys),
-        tippers: Object.assign({}, DEFAULT_SETTINGS.tippers, raw.tippers) });
+      { names: Object.assign({}, DEFAULT_SETTINGS.names, raw.names) });
   } catch (e) { /* ignorieren */ }
   if (!s) s = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
-  // Einmalige Migration: Ring- und Smartwatch-Steuerung standardmäßig aktivieren,
+  // Einmalige Migration: Smartwatch-Steuerung standardmäßig aktivieren,
   // auch bei bestehenden Installationen (die ein gespeichertes "aus" hätten).
-  if (!s.inputV2) { s.ringControl = true; s.watchControl = true; s.inputV2 = true; }
+  if (!s.inputV2) { s.watchControl = true; s.inputV2 = true; }
+  // Ring-/Scroll-Steuerung hat keine UI mehr -> immer dormant (Wheel-Handler inaktiv).
+  s.ringControl = false;
   return s;
 }
 function saveSettings() { localStorage.setItem(KEY_SETTINGS, JSON.stringify(settings)); }
@@ -283,17 +281,6 @@ function popScore(team) {
   el.classList.remove('pop');
   void el.offsetWidth; // Animation neu starten
   el.classList.add('pop');
-}
-
-// Tipp-Flächen an ihre gespeicherten %-Positionen setzen
-function positionTippers() {
-  for (const t of ['A', 'B']) {
-    const el = document.querySelector('#tipper' + t);
-    const p = (settings.tippers && settings.tippers[t]) || { x: 50, y: 50 };
-    el.style.left = p.x + '%';
-    el.style.top = p.y + '%';
-    el.textContent = t; // Beschriftung A / B
-  }
 }
 
 function checkOver() {
@@ -403,15 +390,8 @@ function serveSide(team) {
 }
 
 function render() {
-  // Seiten ggf. tauschen (für Klicker-/Tipper-Belegung)
+  // Seiten ggf. tauschen
   document.querySelector('#court').classList.toggle('swapped', !!settings.swapSides);
-
-  // Tipper-Modus: Tipp-Flächen ein-/ausblenden und positionieren
-  const tippersEl = document.querySelector('#tippers');
-  tippersEl.classList.toggle('hidden', !settings.tipperMode);
-  tippersEl.classList.toggle('setup', !!tipperSetup);
-  if (!(settings.tipperMode && tipperSetup)) clearCalibDots();
-  positionTippers();
 
   // Namen + Punkte
   for (const t of ['A', 'B']) {
@@ -610,17 +590,6 @@ function pickVoice() {
 function speakName(name) {
   return String(name || '').replace(/\+/g, ' und ').replace(/\s+/g, ' ').trim();
 }
-// Stimmen-Auswahlliste füllen
-function populateVoices() {
-  const sel = document.querySelector('#setVoice');
-  if (!sel) return;
-  const de = germanVoices();
-  const list = de.length ? de : allVoices();
-  sel.innerHTML = '<option value="">(automatisch)</option>' +
-    list.map((v) => '<option value="' + v.voiceURI + '">' + v.name +
-      (/^de/i.test(v.lang) ? '' : ' (' + v.lang + ')') + '</option>').join('');
-  sel.value = settings.voiceURI || '';
-}
 // Beliebigen Text mit der gewählten Stimme sprechen
 function speakText(text) {
   if (!('speechSynthesis' in window)) return;
@@ -632,18 +601,6 @@ function speakText(text) {
     speechSynthesis.speak(u);
   } catch (e) {}
 }
-// Kurze Hörprobe nach Stimmwechsel
-function speakSample() {
-  if (!('speechSynthesis' in window)) return;
-  try {
-    speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance('Test. eins, null, zwei.');
-    u.lang = 'de-DE'; u.rate = 0.9;
-    const v = pickVoice(); if (v) u.voice = v;
-    speechSynthesis.speak(u);
-  } catch (e) {}
-}
-if ('speechSynthesis' in window) speechSynthesis.onvoiceschanged = populateVoices;
 
 // ---- Tonsignale (Web Audio, ohne Audiodateien) ----
 let audioCtx = null;
@@ -900,40 +857,28 @@ function setSelectsFromName(team) {
 }
 
 /* =========================================================================
-   Eingabe: Tippen + Funkknopf (Tastatur-Events)
+   Eingabe: feste Tastatur-Kürzel (Desktop-Komfort)
    ========================================================================= */
 function keyId(e) { return e.code || e.key; }
 
 document.addEventListener('keydown', (e) => {
-  // Anlern-Modus: nächste Taste merken
-  if (learning) {
-    e.preventDefault();
-    settings.keys[learning] = keyId(e);
-    saveSettings();
-    const slot = learning;
-    learning = null;
-    updateKeyLabels();
-    $$('.learn').forEach((b) => b.classList.remove('active'));
-    $('#learnStatus').textContent = 'Gespeichert: ' + slot + ' = ' + settings.keys[slot];
-    return;
-  }
   // Während die Einstellungen offen sind, keine Spielaktionen auslösen
   if ($('#settings').open) return;
   // In Eingabefeldern nichts abfangen
   if (e.target && /input|select|textarea/i.test(e.target.tagName)) return;
 
   const id = keyId(e);
-  if (id === settings.keys.A)    { e.preventDefault(); rallyWonBy('A'); }
-  else if (id === settings.keys.B) { e.preventDefault(); rallyWonBy('B'); }
-  else if (id === settings.keys.undo) { e.preventDefault(); undo(); }
-  else if (id === settings.keys.repeat) { e.preventDefault(); ensureAudio(); announce(undefined, true); }
+  if (id === KEYBOARD.A)    { e.preventDefault(); rallyWonBy('A'); }
+  else if (id === KEYBOARD.B) { e.preventDefault(); rallyWonBy('B'); }
+  else if (id === KEYBOARD.undo) { e.preventDefault(); undo(); }
+  else if (id === KEYBOARD.repeat) { e.preventDefault(); ensureAudio(); announce(undefined, true); }
 });
 
 // Tippen auf die Spielfeld-Hälften
 $$('.side').forEach((el) => {
   el.addEventListener('click', () => {
     if ($('#settings').open) return;
-    if (settings.tipperMode) return; // im Tipper-Modus zählen nur die Tipp-Flächen
+    if (settings.swipeControl) return; // bei Wisch-Steuerung übernimmt das Overlay
     if (settings.ringControl && lastPointerType === 'mouse') return; // Ring-Tipp = Wiederholen, nicht zählen
     rallyWonBy(el.dataset.team);
   });
@@ -961,7 +906,7 @@ document.addEventListener('pointerdown', (e) => {
   lastPointerType = e.pointerType || 'touch';
   if (settings.ringControl && e.pointerType === 'mouse' && !anyDialogOpen()) {
     if (e.target.closest('#bar') || e.target.closest('button') || e.target.closest('select') ||
-        e.target.closest('input') || e.target.closest('.tipper') || e.target.closest('#swipeLayer')) return;
+        e.target.closest('input') || e.target.closest('#swipeLayer')) return;
     ensureAudio();
     announce(undefined, true); // Mittel-Knopf des Rings = Stand wiederholen
   }
@@ -1024,60 +969,6 @@ function stopMediaSession() {
   }
 }
 
-// ---- Tipper-Modus: Tippen, Ziehen und Kalibrieren ----
-// Im Einrichten-Modus bleibt an jeder Geräte-Tippstelle ein gelber Punkt liegen.
-// Die letzten zwei bleiben sichtbar, damit man BEIDE Tipp-Stellen gleichzeitig sieht.
-function addCalibDot(clientX, clientY) {
-  const wrap = $('#tapMarkers');
-  const dot = document.createElement('div');
-  dot.className = 'cdot';
-  dot.style.left = (clientX / window.innerWidth * 100) + '%';
-  dot.style.top = (clientY / window.innerHeight * 100) + '%';
-  wrap.appendChild(dot);
-  while (wrap.children.length > 2) wrap.removeChild(wrap.firstChild);
-}
-function clearCalibDots() {
-  const wrap = $('#tapMarkers');
-  if (wrap) wrap.innerHTML = '';
-}
-
-document.addEventListener('pointerdown', (e) => {
-  if (settings.tipperMode && tipperSetup && !$('#settings').open && !e.target.closest('.tipper')) {
-    addCalibDot(e.clientX, e.clientY);
-  }
-}, true);
-
-let drag = null;
-['A', 'B'].forEach((team) => {
-  const el = document.querySelector('#tipper' + team);
-
-  // Tippen = Punkt (nur außerhalb des Einrichtens)
-  el.addEventListener('click', () => {
-    if (tipperSetup) return;
-    rallyWonBy(team);
-  });
-
-  // Ziehen zum Positionieren (nur im Einrichten-Modus)
-  el.addEventListener('pointerdown', (e) => {
-    if (!tipperSetup) return;
-    e.preventDefault();
-    drag = team;
-    el.setPointerCapture(e.pointerId);
-  });
-  el.addEventListener('pointermove', (e) => {
-    if (drag !== team) return;
-    const x = Math.max(2, Math.min(98, e.clientX / window.innerWidth * 100));
-    const y = Math.max(6, Math.min(94, e.clientY / window.innerHeight * 100));
-    settings.tippers[team] = { x, y };
-    positionTippers();
-  });
-  el.addEventListener('pointerup', () => {
-    if (drag !== team) return;
-    drag = null;
-    saveSettings();
-  });
-});
-
 /* =========================================================================
    Bedien-Buttons + Einstellungen
    ========================================================================= */
@@ -1120,19 +1011,12 @@ function openSettings() {
   $('#setStartChooser').checked = settings.showStartChooser;
   $('#setAnnounce').checked = settings.announce;
   $('#setSound').checked = settings.sound;
-  $('#setNaturalVoice').checked = settings.naturalVoice;
-  $('#setRing').checked = settings.ringControl;
   $('#setWatch').checked = settings.watchControl;
   $('#setSwipe').checked = settings.swipeControl;
   $('#setAnnounceTeam').checked = settings.announceTeam;
-  populateVoices();
   $('#setSwap').checked = settings.swapSides;
-  $('#setTipper').checked = settings.tipperMode;
-  $('#setTipperSetup').checked = tipperSetup;
   setSelectsFromName('A');
   setSelectsFromName('B');
-  updateKeyLabels();
-  $('#learnStatus').textContent = '';
   $('#settings').showModal();
 }
 
@@ -1162,16 +1046,11 @@ $('#statsExport').addEventListener('click', exportMatches);
 $('#statsImport').addEventListener('click', () => $('#statsImportFile').click());
 $('#statsImportFile').addEventListener('change', (e) => { if (e.target.files && e.target.files[0]) importMatches(e.target.files[0]); });
 $('#setSound').addEventListener('change', (e) => { settings.sound = e.target.checked; saveSettings(); if (settings.sound) soundFor('point'); });
-$('#setNaturalVoice').addEventListener('change', (e) => { settings.naturalVoice = e.target.checked; saveSettings(); });
-$('#setRing').addEventListener('change', (e) => { settings.ringControl = e.target.checked; saveSettings(); });
 $('#setWatch').addEventListener('change', (e) => { settings.watchControl = e.target.checked; saveSettings(); if (settings.watchControl) startMediaSession(); else stopMediaSession(); });
 $('#setSwipe').addEventListener('change', (e) => { settings.swipeControl = e.target.checked; saveSettings(); updateSwipeLayer(); });
 $('#setAnnounce').addEventListener('change', (e) => { settings.announce = e.target.checked; saveSettings(); render(); });
 $('#setAnnounceTeam').addEventListener('change', (e) => { settings.announceTeam = e.target.checked; saveSettings(); });
-$('#setVoice').addEventListener('change', (e) => { settings.voiceURI = e.target.value; saveSettings(); speakSample(); });
 $('#setSwap').addEventListener('change', (e) => { settings.swapSides = e.target.checked; saveSettings(); render(); });
-$('#setTipper').addEventListener('change', (e) => { settings.tipperMode = e.target.checked; if (!settings.tipperMode) tipperSetup = false; saveSettings(); render(); });
-$('#setTipperSetup').addEventListener('change', (e) => { tipperSetup = e.target.checked; render(); });
 $('#setA1').addEventListener('change', () => teamFromSelects('A'));
 $('#setA2').addEventListener('change', () => teamFromSelects('A'));
 $('#setB1').addEventListener('change', () => teamFromSelects('B'));
@@ -1180,23 +1059,6 @@ $('#setB2').addEventListener('change', () => teamFromSelects('B'));
 $('#newGameBtn').addEventListener('click', () => { $('#settings').close(); resetGame(); });
 $('#flipServe').addEventListener('click', flipServe);
 $('#flipServer').addEventListener('click', flipServer);
-
-// Anlern-Buttons
-$$('.learn').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    learning = btn.dataset.learn;
-    $$('.learn').forEach((b) => b.classList.remove('active'));
-    btn.classList.add('active');
-    $('#learnStatus').textContent = 'Jetzt den Knopf am Klicker drücken …';
-  });
-});
-
-function updateKeyLabels() {
-  for (const slot of ['A', 'B', 'undo', 'repeat']) {
-    const el = $(`[data-keylabel="${slot}"]`);
-    if (el) el.textContent = settings.keys[slot] || '—';
-  }
-}
 
 /* =========================================================================
    Bildschirm wachhalten (Wake Lock)
@@ -1248,8 +1110,6 @@ if ('serviceWorker' in navigator &&
    ========================================================================= */
 function init() {
   if (!localStorage.getItem('pb-intro-seen')) show('intro');
-  updateKeyLabels();
-  populateVoices();
   populateTeamSelects();
   populateMatchmaker();
   fetchOnlineMatches();
