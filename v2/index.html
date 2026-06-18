@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Rajdhani:wght@500;600;700&family=Cinzel:wght@600;700&family=Playfair+Display:wght@600;700;900&family=Great+Vibes&family=Poppins:wght@400;500;600&family=Anton&family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=31" />
+  <link rel="stylesheet" href="styles.css?v=32" />
 </head>
 <body>
   <!-- Vollflächiger Farb-Blitz bei einem Punkt (aus Distanz sichtbar) -->
@@ -69,6 +69,7 @@
   <div id="winner" class="overlay hidden">
     <div class="card">
       <h2 id="winnerText">Spiel!</h2>
+      <button id="winnerSave" class="ghost" style="display:none">Spiel speichern</button>
       <button id="winnerNew" class="primary">Neues Spiel</button>
       <button id="winnerClose" class="ghost">Weiterzählen</button>
     </div>
@@ -204,6 +205,34 @@
         </div>
       </details>
 
+      <h3 class="setgroup">Gruppen &amp; Speichern</h3>
+      <label class="row">
+        <span>Aktive Gruppe</span>
+        <select id="setActiveGroup"></select>
+      </label>
+      <label class="row">
+        <span>Automatisch speichern</span>
+        <input type="checkbox" id="setAutoSave" />
+      </label>
+      <p id="groupInfo" class="muted"></p>
+      <div class="rowctl">
+        <input type="text" id="newGroupName" placeholder="Neue Gruppe" />
+        <button type="button" id="newLocalGroup" class="ghost small">+ Lokal</button>
+        <button type="button" id="newOnlineGroup" class="ghost small">+ Online</button>
+      </div>
+      <div class="rowctl">
+        <input type="text" id="joinCode" placeholder="Code eingeben" />
+        <button type="button" id="joinGroupBtn" class="ghost small">Beitreten</button>
+      </div>
+      <div class="btnrow">
+        <button type="button" id="delGroupBtn" class="ghost small">Aktive Gruppe entfernen</button>
+      </div>
+      <details class="setdetails">
+        <summary>Online einrichten (Worker-URL)</summary>
+        <p class="muted">Für Online-Gruppen brauchst du einen eigenen, kostenlosen Cloudflare-Worker. Anleitung: <code>CLOUDFLARE.md</code> im Projekt. Danach hier die Worker-URL eintragen.</p>
+        <input type="text" id="setWorkerBase" placeholder="https://dein-worker.workers.dev" style="width:100%" />
+      </details>
+
       <h3 class="setgroup">Daten</h3>
       <div class="row">
         <span>Verlauf gespielter Spiele</span>
@@ -228,9 +257,11 @@
   <dialog id="historyDlg">
     <div class="settings">
       <h2>Verlauf</h2>
+      <label class="row"><span>Alle Gruppen zeigen</span><input type="checkbox" id="viewAllHist" /></label>
+      <p class="muted">✕ löscht ein einzelnes Spiel. Lokales Löschen lässt die Online-Gruppe unberührt.</p>
       <div id="historyList"></div>
       <div class="btnrow">
-        <button type="button" id="historyClear" class="danger">Verlauf löschen</button>
+        <button type="button" id="historyClear" class="danger">Lokalen Verlauf löschen</button>
         <button type="button" id="historyClose" class="primary">Schließen</button>
       </div>
     </div>
@@ -240,6 +271,7 @@
   <dialog id="statsDlg">
     <div class="settings">
       <h2>Statistik &amp; Bestenliste</h2>
+      <label class="row"><span>Alle Gruppen zeigen</span><input type="checkbox" id="viewAllStats" /></label>
       <p id="statsSource" class="muted"></p>
       <div id="statsList"></div>
 
@@ -272,6 +304,6 @@
   <!-- Stilles Loop-Audio für die Smartwatch-Mediensteuerung -->
   <audio id="silentAudio" src="silent.wav" loop preload="auto" playsinline></audio>
 
-  <script src="app.js?v=31"></script>
+  <script src="app.js?v=32"></script>
 </body>
 </html>

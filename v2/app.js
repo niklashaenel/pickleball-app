@@ -12,6 +12,7 @@ const KEY_SETTINGS = 'pb-settings-v1';
 const KEY_GAME     = 'pb-game-v1';
 const KEY_MATCH    = 'pb-match-v1';
 const KEY_HISTORY  = 'pb-history-v1';
+const KEY_QUEUE    = 'pb-queue-v1';   // Offline-Warteschlange (Online-Upload)
 
 /* ---- Standard-Einstellungen ---- */
 const DEFAULT_SETTINGS = {
@@ -32,6 +33,10 @@ const DEFAULT_SETTINGS = {
   swapSides: false,
   theme: 'neon',     // Design-Stil
   palette: 'auto',   // Farbpalette ('auto' = Farben des Designs)
+  groups: [{ id: 'local', name: 'Lokal', scope: 'local' }], // Speicher-Gruppen
+  activeGroup: 'local',   // Spiele landen in dieser Gruppe
+  autoSave: true,         // beendete Spiele automatisch speichern
+  workerBase: '',         // URL des eigenen Cloudflare-Workers (leer = Online aus)
   names: { A: 'Team A', B: 'Team B' }
 };
 
@@ -155,6 +160,8 @@ function parsePlayers(nm) {
 }
 function addHistory(entry) {
   entry.ts = Date.now();
+  entry.gid = entry.gid || (entry.ts + '-' + Math.random().toString(36).slice(2, 8));
+  entry.group = settings.activeGroup || 'local';
   entry.names = { A: teamName('A'), B: teamName('B') };
   entry.players = { A: parsePlayers(teamName('A')), B: parsePlayers(teamName('B')) };
   let h = loadHistory();
@@ -162,23 +169,135 @@ function addHistory(entry) {
   if (h.length > 200) h = h.slice(0, 200);
   localStorage.setItem(KEY_HISTORY, JSON.stringify(h));
 }
+// Ergebnis bei Spielende: automatisch speichern oder fürs manuelle Speichern merken.
+let pendingResult = null;
+function finishResult(entry) { pendingResult = entry; if (settings.autoSave) saveResult(); }
+function saveResult() {
+  if (!pendingResult) return;
+  addHistory(pendingResult);   // lokal speichern (taggt Gruppe + gid)
+  saveOnline(pendingResult);   // ggf. an Online-Gruppe anhängen (sonst Warteschlange)
+  pendingResult = null;
+  flash('Gespeichert');
+  updateWinnerSave();
+}
+function updateWinnerSave() {
+  const b = document.querySelector('#winnerSave');
+  if (!b) return;
+  if (pendingResult) { b.textContent = 'Spiel speichern'; b.disabled = false; b.style.display = ''; }
+  else { b.style.display = 'none'; }
+}
 
 // ---- #5a Statistik (Lesen) + Matchmaker + Export/Import ----
-const MATCHES_URL = 'https://raw.githubusercontent.com/niklashaenel/pickleball-app/main/matches.json';
-let onlineMatches = [];
-async function fetchOnlineMatches() {
+let onlineMatches = [];     // Spiele der aktiven Online-Gruppe (vom Worker geladen)
+let viewAllGroups = false;  // Verlauf/Statistik: nur aktive Gruppe oder alle (lokal)
+
+// ---- Gruppen-Helfer ----
+function apiBase() { return (settings.workerBase || '').trim().replace(/\/+$/, ''); }
+function activeGroupObj() { return (settings.groups || []).find((g) => g.id === settings.activeGroup) || settings.groups[0]; }
+function isOnlineGroup() { const g = activeGroupObj(); return !!(g && g.scope === 'online' && g.code); }
+function onlineReady() { return !!apiBase(); }
+function loadQueue() { try { return JSON.parse(localStorage.getItem(KEY_QUEUE)) || []; } catch (e) { return []; } }
+function saveQueue(q) { localStorage.setItem(KEY_QUEUE, JSON.stringify(q)); }
+
+// Ein Spiel an die aktive Online-Gruppe anhängen; bei Fehler/offline in die Warteschlange.
+async function saveOnline(entry) {
+  if (!isOnlineGroup() || !onlineReady()) return;
+  const g = activeGroupObj();
   try {
-    const r = await fetch(MATCHES_URL + '?t=' + Date.now(), { cache: 'no-store' });
-    if (r.ok) { const data = await r.json(); if (Array.isArray(data)) onlineMatches = data; }
-  } catch (e) { /* offline / Datei fehlt noch */ }
+    const r = await fetch(apiBase() + '/api/group/' + g.code + '/games', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ game: entry }) });
+    if (!r.ok) throw 0;
+  } catch (e) { const q = loadQueue(); q.push({ code: g.code, game: entry }); saveQueue(q); }
 }
-function matchKey(m) { return (m.ts || '') + '|' + (m.names ? m.names.A + '/' + m.names.B : ''); }
+// Warteschlange abarbeiten (beim Start + wenn wieder online)
+async function flushQueue() {
+  if (!onlineReady()) return;
+  let q = loadQueue(); if (!q.length) return;
+  const rest = [];
+  for (const it of q) {
+    try {
+      const r = await fetch(apiBase() + '/api/group/' + it.code + '/games', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ game: it.game }) });
+      if (!r.ok) throw 0;
+    } catch (e) { rest.push(it); }
+  }
+  saveQueue(rest);
+}
+// Spiele der aktiven Online-Gruppe laden (ersetzt das frühere matches.json-Laden)
+async function fetchOnlineMatches() {
+  if (!isOnlineGroup() || !onlineReady()) { onlineMatches = []; return; }
+  const g = activeGroupObj();
+  try {
+    const r = await fetch(apiBase() + '/api/group/' + g.code + '?t=' + Date.now(), { cache: 'no-store' });
+    if (r.ok) { const d = await r.json(); onlineMatches = Array.isArray(d.games) ? d.games : []; }
+  } catch (e) { /* offline */ }
+}
+async function deleteOnlineGame(gid) {
+  if (!isOnlineGroup() || !onlineReady()) return false;
+  const g = activeGroupObj();
+  try {
+    const r = await fetch(apiBase() + '/api/group/' + g.code + '/games/' + encodeURIComponent(gid),
+      { method: 'DELETE', headers: { 'X-Admin-Key': g.adminKey || '' } });
+    return r.ok;
+  } catch (e) { return false; }
+}
+async function createOnlineGroup(name) {
+  if (!onlineReady()) { flash('Erst Worker-URL in den Einstellungen eintragen'); return; }
+  try {
+    const r = await fetch(apiBase() + '/api/group', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name || 'Gruppe' }) });
+    if (!r.ok) throw 0;
+    const d = await r.json();
+    const g = { id: 'g' + Date.now(), name: name || d.name || 'Gruppe', scope: 'online', code: d.code, adminKey: d.adminKey, role: 'owner', created: Date.now() };
+    settings.groups.push(g); settings.activeGroup = g.id; saveSettings();
+    await fetchOnlineMatches(); renderGroups();
+    flash('Gruppe „' + g.name + '" angelegt – Code: ' + d.code);
+  } catch (e) { flash('Anlegen fehlgeschlagen'); }
+}
+async function joinOnlineGroup(code) {
+  code = (code || '').trim();
+  if (!code) return;
+  if (!onlineReady()) { flash('Erst Worker-URL in den Einstellungen eintragen'); return; }
+  if (settings.groups.some((g) => g.code === code)) { flash('Gruppe ist schon da'); return; }
+  try {
+    const r = await fetch(apiBase() + '/api/group/' + encodeURIComponent(code) + '?t=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) throw 0;
+    const d = await r.json();
+    const g = { id: 'g' + Date.now(), name: d.name || ('Gruppe ' + code), scope: 'online', code: code, role: 'member', created: Date.now() };
+    settings.groups.push(g); settings.activeGroup = g.id; saveSettings();
+    await fetchOnlineMatches(); renderGroups();
+    flash('Beigetreten: „' + g.name + '"');
+  } catch (e) { flash('Code nicht gefunden'); }
+}
+
+function matchKey(m) { return m.gid ? ('g:' + m.gid) : ((m.ts || '') + '|' + (m.names ? m.names.A + '/' + m.names.B : '')); }
+function inActiveGroup(m) { return viewAllGroups ? true : ((m.group || 'local') === (settings.activeGroup || 'local')); }
 function allMatches() {
   const seen = new Set(), out = [];
-  onlineMatches.concat(loadHistory()).forEach((m) => {
+  onlineMatches.concat(loadHistory().filter(inActiveGroup)).forEach((m) => {
     const k = matchKey(m); if (seen.has(k)) return; seen.add(k); out.push(m);
   });
   return out;
+}
+function renderGroups() {
+  const sel = document.querySelector('#setActiveGroup');
+  if (!sel) return;
+  sel.innerHTML = settings.groups.map((g) =>
+    '<option value="' + g.id + '">' + g.name + (g.scope === 'online' ? ' ☁' : '') + '</option>').join('');
+  sel.value = settings.activeGroup;
+  const as = document.querySelector('#setAutoSave'); if (as) as.checked = !!settings.autoSave;
+  const wb = document.querySelector('#setWorkerBase'); if (wb) wb.value = settings.workerBase || '';
+  const info = document.querySelector('#groupInfo');
+  if (info) {
+    const g = activeGroupObj();
+    if (g && g.scope === 'online') {
+      info.textContent = 'Online-Gruppe · Code zum Teilen: ' + g.code + (g.role === 'owner' ? ' (Ersteller)' : '');
+    } else if (!onlineReady()) {
+      info.textContent = 'Lokale Gruppe. Für Online-Gruppen unten die Worker-URL eintragen.';
+    } else {
+      info.textContent = 'Lokale Gruppe (nur auf diesem Gerät).';
+    }
+  }
 }
 function computeStats() {
   const stats = {};
@@ -284,6 +403,12 @@ function loadSettings() {
   if (!s.inputV2) { s.watchControl = true; s.inputV2 = true; }
   // Ring-/Scroll-Steuerung hat keine UI mehr -> immer dormant (Wheel-Handler inaktiv).
   s.ringControl = false;
+  // Gruppen sicherstellen: Array vorhanden, eingebaute "Lokal"-Gruppe immer dabei.
+  if (!Array.isArray(s.groups)) s.groups = [];
+  if (!s.groups.some((g) => g.id === 'local')) s.groups.unshift({ id: 'local', name: 'Lokal', scope: 'local' });
+  if (!s.groups.some((g) => g.id === s.activeGroup)) s.activeGroup = 'local';
+  if (typeof s.autoSave !== 'boolean') s.autoSave = true;
+  if (typeof s.workerBase !== 'string') s.workerBase = '';
   return s;
 }
 function saveSettings() { localStorage.setItem(KEY_SETTINGS, JSON.stringify(settings)); }
@@ -336,17 +461,17 @@ function rallyWonBy(team) {
       flash('Seitenwechsel');
     }
   }
-  // Spiel beendet -> Match (Satz) zählen und Verlauf speichern
+  // Spiel beendet -> Match (Satz) zählen und Ergebnis (auto/manuell) speichern
   if (game.over && !game.counted) {
     game.counted = true;
+    let entry = null;
     if (settings.matchBestOf > 1) {
       match[game.winner]++; saveMatch();
-      if (match[game.winner] >= gamesNeeded()) {
-        addHistory({ type: 'match', winner: game.winner, sets: match.A + ':' + match.B });
-      }
+      if (match[game.winner] >= gamesNeeded()) entry = { type: 'match', winner: game.winner, sets: match.A + ':' + match.B };
     } else {
-      addHistory({ type: 'game', winner: game.winner, score: game.scores.A + ':' + game.scores.B });
+      entry = { type: 'game', winner: game.winner, score: game.scores.A + ':' + game.scores.B };
     }
+    if (entry) finishResult(entry);
   }
 
   saveGame();
@@ -441,18 +566,38 @@ function coinToss() {
 function renderHistory() {
   const el = document.querySelector('#historyList');
   if (!el) return;
-  const h = loadHistory();
-  if (!h.length) { el.innerHTML = '<p class="muted">Noch keine Spiele gespeichert.</p>'; return; }
-  el.innerHTML = h.map((e) => {
+  const localKeys = new Set(loadHistory().map(matchKey));
+  const list = allMatches();
+  if (!list.length) { el.innerHTML = '<p class="muted">Noch keine Spiele gespeichert.</p>'; return; }
+  el.innerHTML = list.map((e) => {
     const d = new Date(e.ts);
     const date = d.toLocaleDateString('de-DE') + ' ' + d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
     const w = (e.names && e.names[e.winner]) || ('Team ' + e.winner);
     const res = e.type === 'match' ? ('Match ' + e.sets) : ('Spiel ' + e.score);
     const teams = e.names ? (e.names.A + ' vs ' + e.names.B) : '';
-    return '<div class="hist-row"><span class="hist-date">' + date + '</span>' +
+    const src = localKeys.has(matchKey(e)) ? 'local' : 'online';
+    const id = e.gid || e.ts || '';
+    return '<div class="hist-row"><button class="hist-del" data-gid="' + id + '" data-src="' + src +
+           '" title="Spiel löschen" aria-label="Spiel löschen">✕</button>' +
+           '<span class="hist-date">' + date + (src === 'online' ? ' · ☁' : '') + '</span>' +
            '<span class="hist-teams">' + teams + '</span>' +
            '<span class="hist-res">' + res + ' · 🏆 ' + w + '</span></div>';
   }).join('');
+  el.querySelectorAll('.hist-del').forEach((b) => b.addEventListener('click', () => deleteGame(b.dataset.gid, b.dataset.src)));
+}
+async function deleteGame(gid, src) {
+  if (!gid) return;
+  if (src === 'online') {
+    const ok = await deleteOnlineGame(gid);
+    if (!ok) { flash('Online löschen nur als Ersteller der Gruppe'); return; }
+    await fetchOnlineMatches();
+  } else {
+    const h = loadHistory().filter((m) => String(m.gid || m.ts) !== String(gid));
+    localStorage.setItem(KEY_HISTORY, JSON.stringify(h));
+  }
+  renderHistory();
+  const sd = document.querySelector('#statsDlg');
+  if (sd && sd.open) renderStats();
 }
 
 /* Manuelle Korrekturen */
@@ -545,6 +690,7 @@ function render() {
       newBtn.textContent = 'Neues Spiel';
       newBtn.onclick = resetGame;
     }
+    updateWinnerSave(); // „Spiel speichern" anzeigen, falls noch nicht gespeichert
     show('winner');
   }
 
@@ -1139,6 +1285,7 @@ function openSettings() {
   $('#setSwap').checked = settings.swapSides;
   setSelectsFromName('A');
   setSelectsFromName('B');
+  renderGroups();
   $('#settings').showModal();
 }
 
@@ -1156,12 +1303,38 @@ $('#setMatch').addEventListener('change', (e) => { settings.matchBestOf = parseI
 $('#setStartServer').addEventListener('change', (e) => { settings.startServer = e.target.value; saveSettings(); applyStartServer(); render(); });
 $('#setStartChooser').addEventListener('change', (e) => { settings.showStartChooser = e.target.checked; saveSettings(); render(); });
 $('#coinTossBtn').addEventListener('click', coinToss);
-$('#historyBtn').addEventListener('click', () => { renderHistory(); document.querySelector('#historyDlg').showModal(); });
-$('#historyClear').addEventListener('click', () => { localStorage.removeItem(KEY_HISTORY); renderHistory(); });
+$('#historyBtn').addEventListener('click', async () => {
+  $('#viewAllHist').checked = viewAllGroups; renderHistory(); document.querySelector('#historyDlg').showModal();
+  await fetchOnlineMatches(); renderHistory();
+});
+$('#historyClear').addEventListener('click', () => {
+  const keep = loadHistory().filter((m) => !inActiveGroup(m)); // nur die angezeigten lokalen Spiele entfernen
+  localStorage.setItem(KEY_HISTORY, JSON.stringify(keep)); renderHistory();
+});
 $('#historyClose').addEventListener('click', () => { document.querySelector('#historyDlg').close(); });
+$('#viewAllHist').addEventListener('change', (e) => { viewAllGroups = e.target.checked; renderHistory(); });
+
+// Gruppen & Speichern
+$('#winnerSave').addEventListener('click', saveResult);
+$('#setActiveGroup').addEventListener('change', async (e) => { settings.activeGroup = e.target.value; saveSettings(); renderGroups(); await fetchOnlineMatches(); });
+$('#setAutoSave').addEventListener('change', (e) => { settings.autoSave = e.target.checked; saveSettings(); });
+$('#setWorkerBase').addEventListener('change', (e) => { settings.workerBase = (e.target.value || '').trim(); saveSettings(); renderGroups(); flushQueue(); });
+$('#newLocalGroup').addEventListener('click', () => {
+  const n = ($('#newGroupName').value || '').trim(); if (!n) { flash('Name eingeben'); return; }
+  const g = { id: 'g' + Date.now(), name: n, scope: 'local' };
+  settings.groups.push(g); settings.activeGroup = g.id; saveSettings(); $('#newGroupName').value = ''; renderGroups();
+});
+$('#newOnlineGroup').addEventListener('click', () => { const n = ($('#newGroupName').value || '').trim(); $('#newGroupName').value = ''; createOnlineGroup(n); });
+$('#joinGroupBtn').addEventListener('click', () => { const c = $('#joinCode').value; $('#joinCode').value = ''; joinOnlineGroup(c); });
+$('#delGroupBtn').addEventListener('click', () => {
+  if (settings.activeGroup === 'local') { flash('Die Gruppe „Lokal" bleibt'); return; }
+  settings.groups = settings.groups.filter((g) => g.id !== settings.activeGroup);
+  settings.activeGroup = 'local'; saveSettings(); renderGroups(); fetchOnlineMatches();
+});
 
 // Statistik-Dialog
-$('#statsBtn').addEventListener('click', async () => { renderStats(); $('#statsDlg').showModal(); await fetchOnlineMatches(); renderStats(); });
+$('#statsBtn').addEventListener('click', async () => { $('#viewAllStats').checked = viewAllGroups; renderStats(); $('#statsDlg').showModal(); await fetchOnlineMatches(); renderStats(); });
+$('#viewAllStats').addEventListener('change', (e) => { viewAllGroups = e.target.checked; renderStats(); });
 $('#statsClose').addEventListener('click', () => $('#statsDlg').close());
 $('#mmBtn').addEventListener('click', runMatchmaker);
 $('#statsExport').addEventListener('click', exportMatches);
@@ -1237,8 +1410,11 @@ function init() {
   applyTheme(settings.theme); // markiert aktives Design + Palette
   populateTeamSelects();
   populateMatchmaker();
+  renderGroups();
   fetchOnlineMatches();
+  flushQueue();
   probeClips();
   render();
 }
+window.addEventListener('online', flushQueue);
 init();
