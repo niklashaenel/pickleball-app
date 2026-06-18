@@ -33,14 +33,6 @@ body {
   user-select: none;
   touch-action: manipulation;
 }
-/* futuristisches Raster */
-body::before {
-  content: ""; position: fixed; inset: 0; pointer-events: none; opacity: .35; z-index: 0;
-  background-image:
-    linear-gradient(rgba(var(--cyan-rgb),.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(var(--cyan-rgb),.06) 1px, transparent 1px);
-  background-size: 44px 44px;
-}
 
 /* ---- Kopfzeile ---- */
 #bar {
@@ -328,9 +320,6 @@ a { color: var(--cyan); }
 /* ============================================================
    Design-Stile: Form & Deko (Farben + Schriften kommen aus den Variablen)
    ============================================================ */
-/* Hintergrund-Raster nur im Neon-Look */
-body.design-klassik::before, body.design-elegant::before, body.design-minimal::before,
-body.design-sport::before, body.design-pastell::before { display: none; }
 /* alle Nicht-Neon-Designs: flacher Hintergrund, keine Seiten-Tönung */
 body.design-klassik, body.design-elegant, body.design-minimal,
 body.design-sport, body.design-pastell { background: var(--bg); }
