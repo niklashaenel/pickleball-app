@@ -67,7 +67,15 @@ const PALETTES = [
   { id: 'rotblau',    name: 'Rot/Blau',      a: '#ef4444', b: '#3b82f6', aRgb: '239,68,68',   bRgb: '59,130,246' },
   { id: 'gruengold',  name: 'Grün/Gold',     a: '#16a34a', b: '#eab308', aRgb: '22,163,74',   bRgb: '234,179,8' },
   { id: 'korallminze',name: 'Koralle/Minze', a: '#fb7185', b: '#2dd4bf', aRgb: '251,113,133', bRgb: '45,212,191' },
-  { id: 'magentacyan',name: 'Magenta/Cyan',  a: '#d946ef', b: '#06b6d4', aRgb: '217,70,239',  bRgb: '6,182,212' }
+  { id: 'magentacyan',name: 'Magenta/Cyan',  a: '#d946ef', b: '#06b6d4', aRgb: '217,70,239',  bRgb: '6,182,212' },
+  { id: 'orangerot',  name: 'Orange/Rot',    a: '#ff7a1a', b: '#e11d48', aRgb: '255,122,26',  bRgb: '225,29,72' },
+  { id: 'blaugruen',  name: 'Blau/Grün',     a: '#2563eb', b: '#10b981', aRgb: '37,99,235',   bRgb: '16,185,129' },
+  { id: 'goldroyal',  name: 'Gold/Royal',    a: '#ffcf33', b: '#2563eb', aRgb: '255,207,51',  bRgb: '37,99,235' },
+  { id: 'goldrose',   name: 'Gold/Rosé',     a: '#ffcf33', b: '#ff4d8d', aRgb: '255,207,51',  bRgb: '255,77,141' },
+  { id: 'goldtuerkis',name: 'Gold/Türkis',   a: '#ffcf33', b: '#17c3b2', aRgb: '255,207,51',  bRgb: '23,195,178' },
+  { id: 'goldgruen',  name: 'Gold/Grün',     a: '#ffcf33', b: '#21c45d', aRgb: '255,207,51',  bRgb: '33,196,93' },
+  { id: 'bernsteinviolett', name: 'Bernstein/Violett', a: '#f59e0b', b: '#8b5cf6', aRgb: '245,158,11', bRgb: '139,92,246' },
+  { id: 'limettecyan',name: 'Limette/Cyan',  a: '#a3e635', b: '#06b6d4', aRgb: '163,230,53',  bRgb: '6,182,212' }
 ];
 function applyPaletteColors() {
   const p = PALETTES.find((x) => x.id === settings.palette);
