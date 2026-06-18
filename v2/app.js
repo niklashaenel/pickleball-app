@@ -954,11 +954,11 @@ updateSwipeLayer();
 // Ring UND Uhr senden dieselben Media-Events (nicht unterscheidbar):
 //   hoch/next   1× = Punkt A,  2× schnell = Punkt zurück (Undo, mit Ton)
 //   runter/prev 1× = Punkt B,  2× schnell = Punkt zurück (Undo, mit Ton)
-//   Mitte/Play-Pause 1× = Stand ansagen, 2× schnell = Punkt zurück (Undo)
+//   Mitte/Play-Pause 1× = Stand ansagen, mehrmals tippen = genau 1× Punkt zurück (Undo)
 // Zählen bleibt sofort; ein schneller zweiter Druck nimmt zurück.
 const DBL_MS = 800;    // Zeitfenster für "schnell doppelt" bei hoch/runter
-const MID_MS = 600;    // Zeitfenster für Doppel-Tipp auf die Mitte (Uhr)
-let lastNextPress = 0, lastPrevPress = 0, middleTimer = null;
+const MID_MS = 1500;   // großzügiges Fenster für die Mitte: träge Uhr-Tipps als Mehrfach erkennen
+let lastNextPress = 0, lastPrevPress = 0, lastMiddlePress = 0, middleUndone = false;
 function onMediaNext() {
   ensureAudio();
   const now = Date.now();
@@ -972,11 +972,18 @@ function onMediaPrev() {
   else { lastPrevPress = now; rallyWonBy('B'); }
 }
 function onMediaMiddle() {
-  // Mitte/Play-Pause: 1× (allein) = Stand ansagen, 2× schnell = Punkt zurück (Undo).
-  // Timer statt sofort: mehrfaches Tippen stottert nicht (Ansage wird vom 2. Druck verworfen).
+  // Mitte/Play-Pause: einzelner Tipp = Stand ansagen (sofort).
+  // Mehrmals tippen innerhalb MID_MS (auch träge auf der Uhr) = genau EINMAL Punkt zurück.
   ensureAudio();
-  if (middleTimer) { clearTimeout(middleTimer); middleTimer = null; undo(); return; } // doppelt = Undo
-  middleTimer = setTimeout(() => { middleTimer = null; announce(undefined, true); }, MID_MS);
+  const now = Date.now();
+  if (now - lastMiddlePress < MID_MS) {
+    lastMiddlePress = now;                                  // Fenster verlängern, solange getippt wird
+    if (!middleUndone) { middleUndone = true; undo(); }     // Mehrfach-Tipp = genau 1× zurück
+    return;
+  }
+  lastMiddlePress = now;
+  middleUndone = false;
+  announce(undefined, true);                                // einzelner Tipp = ansagen
 }
 function startMediaSession() {
   if (!settings.watchControl) return;
