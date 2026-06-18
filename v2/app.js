@@ -951,39 +951,23 @@ function updateSwipeLayer() {
 updateSwipeLayer();
 
 // ---- #2 Smartwatch-/Ring-Steuerung (Media Session) ----
-// Ring UND Uhr senden dieselben Media-Events (nicht unterscheidbar):
-//   hoch/next   1× = Punkt A,  2× schnell = Punkt zurück (Undo, mit Ton)
-//   runter/prev 1× = Punkt B,  2× schnell = Punkt zurück (Undo, mit Ton)
-//   Mitte/Play-Pause 1× = Stand ansagen, mehrmals tippen = genau 1× Punkt zurück (Undo)
-// Zählen bleibt sofort; ein schneller zweiter Druck nimmt zurück.
-const DBL_MS = 800;    // Zeitfenster für "schnell doppelt" bei hoch/runter
-const MID_MS = 1500;   // großzügiges Fenster für die Mitte: träge Uhr-Tipps als Mehrfach erkennen
-let lastNextPress = 0, lastPrevPress = 0, lastMiddlePress = 0, middleUndone = false;
-function onMediaNext() {
-  ensureAudio();
-  const now = Date.now();
-  if (lastNextPress && now - lastNextPress < DBL_MS) { lastNextPress = 0; undo(); }   // doppelt = Undo (mit Ton)
-  else { lastNextPress = now; rallyWonBy('A'); }
-}
-function onMediaPrev() {
-  ensureAudio();
-  const now = Date.now();
-  if (lastPrevPress && now - lastPrevPress < DBL_MS) { lastPrevPress = 0; undo(); } // doppelt = Undo (mit Ton)
-  else { lastPrevPress = now; rallyWonBy('B'); }
-}
+// Ganz einfach & zuverlässig (kein Doppel-Tipp, KEIN Undo auf der Uhr):
+//   oben/next ODER rechts/seekforward = Punkt A
+//   unten/previoustrack               = Punkt B
+//   Mitte/Play-Pause                  = Stand ansagen
+// Vertippt? Am Handy mit ↩︎ zurücknehmen.
+const MID_MS = 1000;   // Entprellen der Mitte-Ansage (kein Gestotter bei Doppel-Signalen)
+let lastMiddlePress = 0;
+function onMediaA() { ensureAudio(); rallyWonBy('A'); }
+function onMediaB() { ensureAudio(); rallyWonBy('B'); }
 function onMediaMiddle() {
-  // Mitte/Play-Pause: einzelner Tipp = Stand ansagen (sofort).
-  // Mehrmals tippen innerhalb MID_MS (auch träge auf der Uhr) = genau EINMAL Punkt zurück.
+  // Mitte/Play-Pause = Stand ansagen. Entprellt, damit schnelle Folge-Tipps
+  // (oder Doppel-Signale der Uhr pro Druck) die Ansage nicht ständig neu starten.
   ensureAudio();
   const now = Date.now();
-  if (now - lastMiddlePress < MID_MS) {
-    lastMiddlePress = now;                                  // Fenster verlängern, solange getippt wird
-    if (!middleUndone) { middleUndone = true; undo(); }     // Mehrfach-Tipp = genau 1× zurück
-    return;
-  }
+  if (now - lastMiddlePress < MID_MS) return;
   lastMiddlePress = now;
-  middleUndone = false;
-  announce(undefined, true);                                // einzelner Tipp = ansagen
+  announce(undefined, true);
 }
 function startMediaSession() {
   if (!settings.watchControl) return;
@@ -994,11 +978,12 @@ function startMediaSession() {
   if ('mediaSession' in navigator) {
     try {
       if (window.MediaMetadata) navigator.mediaSession.metadata = new MediaMetadata({ title: 'Pickleball', artist: 'Punktezähler' });
-      navigator.mediaSession.setActionHandler('nexttrack', onMediaNext);
-      navigator.mediaSession.setActionHandler('previoustrack', onMediaPrev);
-      navigator.mediaSession.setActionHandler('play', onMediaMiddle);
+      navigator.mediaSession.setActionHandler('nexttrack', onMediaA);       // oben = A
+      navigator.mediaSession.setActionHandler('previoustrack', onMediaB);   // unten = B
+      navigator.mediaSession.setActionHandler('play', onMediaMiddle);       // Mitte = ansagen
       navigator.mediaSession.setActionHandler('pause', onMediaMiddle);
-      // rechts/links (seek) bewusst NICHT belegen -> dort passiert nichts
+      try { navigator.mediaSession.setActionHandler('seekforward', onMediaA); } catch (e) {} // rechts = A
+      // seekbackward (links) bewusst NICHT belegt
       navigator.mediaSession.playbackState = 'playing';
     } catch (e) {}
   }
