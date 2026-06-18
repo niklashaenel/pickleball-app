@@ -38,7 +38,6 @@ const KEYBOARD = { A: 'ArrowLeft', B: 'ArrowRight', undo: 'Backspace', repeat: '
 
 // Vorübergehende Zustände (nicht gespeichert)
 let startChosen = false; // wurde der Startaufschlag für das aktuelle Spiel schon bestätigt?
-let frozen = false;      // Freeze-Sperre: blockiert versehentliches Zählen/Undo
 
 /* ---- Zahlwörter für die deutsche Ansage ---- */
 const WORDS = ['null','eins','zwei','drei','vier','fünf','sechs','sieben','acht','neun',
@@ -222,7 +221,6 @@ function snapshot() { return JSON.parse(JSON.stringify(game)); }
 
 /* Kern: Team `team` hat den Ballwechsel gewonnen */
 function rallyWonBy(team) {
-  if (frozen) return; // Sperre aktiv: nichts zählen
   if (game.over) return;
   history.push(snapshot());
 
@@ -296,16 +294,13 @@ function checkOver() {
   }
 }
 
-function doUndo(silent) {
-  if (frozen) return false; // Sperre aktiv: kein Undo
-  if (!history.length) { if (!silent) flash('Nichts rückgängig'); return false; }
+function undo() {
+  if (!history.length) { flash('Nichts rückgängig'); return; }
   game = history.pop();
-  if (!silent) undoTone(); // kleiner Bestätigungston beim Zurücknehmen
+  undoTone(); // kleiner Bestätigungston beim Zurücknehmen
   saveGame();
   render();
-  return true;
 }
-function undo() { doUndo(false); }
 
 function resetGame() {
   history = [];
@@ -314,7 +309,6 @@ function resetGame() {
   saveMatch();
   saveGame();
   startChosen = false;
-  frozen = false; document.body.classList.remove('frozen'); // Sperre lösen (lautlos)
   hide('winner');
   render();
 }
@@ -647,22 +641,6 @@ function winJingle() {
   beep(1175, 220, 'triangle', 0.28);
 }
 
-// ---- Freeze-Sperre (gegen versehentliches Zählen) ----
-// Töne bewusst klar unterscheidbar: Sperren = absteigend, Entsperren = aufsteigend.
-function freezeTone(locking) {
-  ensureAudio();
-  if (locking) { beep(640, 130, 'square', 0); beep(300, 220, 'square', 0.14); } // ab
-  else { beep(440, 120, 'square', 0); beep(900, 220, 'square', 0.14); }          // auf
-}
-function setFrozen(on) {
-  on = !!on;
-  if (frozen === on) return;
-  frozen = on;
-  document.body.classList.toggle('frozen', frozen);
-  freezeTone(frozen);
-  flash(frozen ? '🔒 Gesperrt' : '🔓 Entsperrt');
-}
-function toggleFreeze() { ensureAudio(); setFrozen(!frozen); }
 // Kurzer Bestätigungston beim Zurücknehmen eines Punkts (klar erkennbar, eigenständig)
 function undoTone() { ensureAudio(); beep(440, 90, 'sine', 0); beep(300, 130, 'sine', 0.07); }
 
@@ -951,8 +929,8 @@ function updateSwipeLayer() {
   l.addEventListener('pointerdown', (e) => {
     sx = e.clientX; sy = e.clientY; longPressed = false;
     clearTimer();
-    // Lang drücken (~0,8s ruhig) = Freeze-Sperre umschalten
-    pressTimer = setTimeout(() => { pressTimer = null; longPressed = true; toggleFreeze(); }, 800);
+    // Lang drücken (~0,8s ruhig) = Punkt zurücknehmen (Undo)
+    pressTimer = setTimeout(() => { pressTimer = null; longPressed = true; ensureAudio(); undo(); }, 800);
   });
   l.addEventListener('pointermove', (e) => {
     if (pressTimer && Math.hypot(e.clientX - sx, e.clientY - sy) > 14) clearTimer(); // Wisch -> kein Lang-Druck
@@ -960,7 +938,7 @@ function updateSwipeLayer() {
   l.addEventListener('pointercancel', clearTimer);
   l.addEventListener('pointerup', (e) => {
     clearTimer();
-    if (longPressed) { longPressed = false; return; } // war Lang-Druck (Freeze) -> sonst nichts
+    if (longPressed) { longPressed = false; return; } // war Lang-Druck (Undo) -> sonst nichts
     if (anyDialogOpen()) return;
     const dx = e.clientX - sx, dy = e.clientY - sy;
     const dist = Math.hypot(dx, dy);
@@ -971,17 +949,15 @@ function updateSwipeLayer() {
   });
 })();
 updateSwipeLayer();
-// Sperr-Abzeichen antippen entsperrt ebenfalls (Sicherheitsausgang)
-(() => { const b = $('#freezeBadge'); if (b) b.addEventListener('click', () => setFrozen(false)); })();
 
 // ---- #2 Smartwatch-/Ring-Steuerung (Media Session) ----
 // Ring UND Uhr senden dieselben Media-Events (nicht unterscheidbar):
 //   hoch/next   1× = Punkt A,  2× schnell = Punkt zurück (Undo, mit Ton)
-//   runter/prev 1× = Punkt B,  2× schnell = Sperre an/aus (mit Signalton)
-//   Mitte/Play-Pause 1× = Stand ansagen, 2× = Sperre an/aus
-// Zählen bleibt sofort; ein schneller zweiter Druck nimmt es zurück bzw. sperrt.
+//   runter/prev 1× = Punkt B,  2× schnell = Punkt zurück (Undo, mit Ton)
+//   Mitte/Play-Pause = Stand ansagen
+// Zählen bleibt sofort; ein schneller zweiter Druck (hoch ODER runter) nimmt zurück.
 const DBL_MS = 800; // Zeitfenster für "schnell doppelt" bei hoch/runter
-let lastNextPress = 0, lastPrevPress = 0, middleTimer = null;
+let lastNextPress = 0, lastPrevPress = 0;
 function onMediaNext() {
   ensureAudio();
   const now = Date.now();
@@ -991,14 +967,10 @@ function onMediaNext() {
 function onMediaPrev() {
   ensureAudio();
   const now = Date.now();
-  if (lastPrevPress && now - lastPrevPress < DBL_MS) { lastPrevPress = 0; doUndo(true); toggleFreeze(); } // doppelt = Sperre
+  if (lastPrevPress && now - lastPrevPress < DBL_MS) { lastPrevPress = 0; undo(); } // doppelt = Undo (mit Ton)
   else { lastPrevPress = now; rallyWonBy('B'); }
 }
-function onMediaMiddle() {  // Play/Pause: kurz warten -> 1× ansagen, 2× sperren
-  ensureAudio();
-  if (middleTimer) { clearTimeout(middleTimer); middleTimer = null; toggleFreeze(); return; }
-  middleTimer = setTimeout(() => { middleTimer = null; announce(undefined, true); }, 600);
-}
+function onMediaMiddle() { ensureAudio(); announce(undefined, true); } // Mitte = Stand ansagen
 function startMediaSession() {
   if (!settings.watchControl) return;
   const a = $('#silentAudio');
@@ -1012,9 +984,7 @@ function startMediaSession() {
       navigator.mediaSession.setActionHandler('previoustrack', onMediaPrev);
       navigator.mediaSession.setActionHandler('play', onMediaMiddle);
       navigator.mediaSession.setActionHandler('pause', onMediaMiddle);
-      // Reserve: falls die Uhr Skip- statt Track-Tasten sendet
-      try { navigator.mediaSession.setActionHandler('seekforward', onMediaNext); } catch (e) {}
-      try { navigator.mediaSession.setActionHandler('seekbackward', onMediaPrev); } catch (e) {}
+      // rechts/links (seek) bewusst NICHT belegen -> dort passiert nichts
       navigator.mediaSession.playbackState = 'playing';
     } catch (e) {}
   }
@@ -1108,7 +1078,7 @@ $('#statsImport').addEventListener('click', () => $('#statsImportFile').click())
 $('#statsImportFile').addEventListener('change', (e) => { if (e.target.files && e.target.files[0]) importMatches(e.target.files[0]); });
 $('#setSound').addEventListener('change', (e) => { settings.sound = e.target.checked; saveSettings(); if (settings.sound) soundFor('point'); });
 $('#setWatch').addEventListener('change', (e) => { settings.watchControl = e.target.checked; saveSettings(); if (settings.watchControl) startMediaSession(); else stopMediaSession(); });
-$('#setSwipe').addEventListener('change', (e) => { settings.swipeControl = e.target.checked; saveSettings(); updateSwipeLayer(); if (!settings.swipeControl) { frozen = false; document.body.classList.remove('frozen'); } });
+$('#setSwipe').addEventListener('change', (e) => { settings.swipeControl = e.target.checked; saveSettings(); updateSwipeLayer(); });
 $('#setAnnounce').addEventListener('change', (e) => { settings.announce = e.target.checked; saveSettings(); render(); });
 $('#setAnnounceTeam').addEventListener('change', (e) => { settings.announceTeam = e.target.checked; saveSettings(); });
 $('#setSwap').addEventListener('change', (e) => { settings.swapSides = e.target.checked; saveSettings(); render(); });

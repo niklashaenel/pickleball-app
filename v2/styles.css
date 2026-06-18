@@ -265,21 +265,6 @@ button { font-family: var(--font-ui); }
    fängt Finger-Wische ab; touch-action:none verhindert das native Scrollen. */
 #swipeLayer { position: fixed; inset: 0; z-index: 2; background: transparent; touch-action: none; }
 #swipeLayer.hidden { display: none; }
-
-/* Freeze-Sperre: großes, aus Distanz sichtbares Abzeichen; antippen entsperrt */
-.freeze-badge {
-  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
-  display: none; z-index: 16; flex-direction: column; align-items: center; gap: .2rem;
-  background: rgba(20,2,8,.88); color: #ff5470; border: 2px solid #ff3b5c; border-radius: 1rem;
-  padding: 1rem 1.7rem; font-family: var(--font-display); font-weight: 700;
-  font-size: clamp(1.6rem, 7vw, 2.6rem); letter-spacing: .04em;
-  text-shadow: 0 0 12px rgba(255,60,90,.7); box-shadow: 0 0 30px rgba(255,40,80,.5);
-  cursor: pointer; animation: freezePulse 1.4s ease-in-out infinite;
-}
-.freeze-badge small { font-family: var(--font-ui); font-weight: 600; font-size: .8rem; color: #ffd0d8; letter-spacing: 0; }
-body.frozen .freeze-badge { display: flex; }
-body.frozen #court { filter: grayscale(.5) brightness(.62); }
-@keyframes freezePulse { 0%,100% { box-shadow: 0 0 22px rgba(255,40,80,.4); } 50% { box-shadow: 0 0 46px rgba(255,40,80,.85); } }
 #scoreFlash.flash { animation: scoreflash .5s ease-out; }
 @keyframes scoreflash { 0% { opacity: .9; } 100% { opacity: 0; } }
 #scoreFlash.teamA { background: radial-gradient(circle at 30% 50%, rgba(0,229,255,.95), rgba(0,150,255,.35) 70%); }
