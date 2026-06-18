@@ -2,50 +2,69 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Klicker-Test</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Eingabe-Diagnose</title>
   <style>
     :root { color-scheme: dark; }
     * { box-sizing: border-box; }
     body {
       margin: 0; min-height: 100vh;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: 1rem; padding: 1.2rem;
+      display: flex; flex-direction: column; align-items: center;
+      gap: .9rem; padding: 1.1rem;
       font-family: system-ui, sans-serif;
       background: #0f172a; color: #e2e8f0; text-align: center;
     }
-    h1 { font-size: 1.3rem; margin: 0; }
-    p  { margin: 0; color: #94a3b8; max-width: 38rem; }
+    h1 { font-size: 1.25rem; margin: 0; }
+    p  { margin: 0; color: #94a3b8; max-width: 40rem; font-size: .95rem; }
     #big {
-      font-size: clamp(3rem, 18vw, 9rem); font-weight: 800; line-height: 1;
-      color: #facc15; word-break: break-all;
+      font-size: clamp(2.2rem, 12vw, 5rem); font-weight: 800; line-height: 1.05;
+      color: #facc15; word-break: break-word; min-height: 1.1em;
     }
-    #detail { font-size: 1.1rem; color: #cbd5e1; }
+    #detail { font-size: 1rem; color: #cbd5e1; }
     #detail span { color: #fff; font-weight: 700; }
-    #log {
-      width: 100%; max-width: 38rem; text-align: left;
-      background: #1e293b; border-radius: .6rem; padding: .6rem .9rem;
-      font-family: ui-monospace, monospace; font-size: .9rem;
-      max-height: 32vh; overflow: auto;
+    .btn {
+      font-size: 1.05rem; font-weight: 700; padding: .7rem 1.2rem; border-radius: .7rem;
+      border: 1px solid #38bdf8; background: #0b3a52; color: #e0f2fe; cursor: pointer;
     }
-    #log div { padding: .15rem 0; border-bottom: 1px solid #334155; }
-    .hint { font-size: .85rem; color: #64748b; }
+    .btn.on { background: #047857; border-color: #34d399; color: #ecfdf5; }
+    #log {
+      width: 100%; max-width: 40rem; text-align: left;
+      background: #1e293b; border-radius: .6rem; padding: .5rem .8rem;
+      font-family: ui-monospace, monospace; font-size: .85rem;
+      max-height: 40vh; overflow: auto;
+    }
+    #log div { padding: .12rem 0; border-bottom: 1px solid #334155; }
+    .tag { display: inline-block; min-width: 4.6em; font-weight: 700; }
+    .t-key   { color: #fca5a5; }
+    .t-wheel { color: #7dd3fc; }
+    .t-ptr   { color: #fcd34d; }
+    .t-touch { color: #c4b5fd; }
+    .t-media { color: #6ee7b7; }
+    .hint { font-size: .82rem; color: #64748b; }
     a { color: #38bdf8; }
+    .clearbtn { font-size: .82rem; background: none; border: none; color: #64748b; text-decoration: underline; cursor: pointer; }
   </style>
 </head>
 <body>
-  <h1>🎾 Klicker-Test</h1>
-  <p>Koppel deinen Bluetooth-Klicker mit diesem Gerät und drück die Knöpfe.
-     Wenn unten etwas erscheint, <strong>kommt der Tastendruck an</strong> – super!
-     Notier dir, was bei <em>code</em> steht.</p>
+  <h1>🎾 Eingabe-Diagnose</h1>
+  <p>Koppel deinen <strong>Ring/Klicker</strong> bzw. deine <strong>Smartwatch</strong> mit diesem
+     Gerät und bediene sie. Unten siehst du <strong>live, was wirklich ankommt</strong> – das sagt
+     uns, wie wir die Steuerung zuordnen.</p>
 
   <div id="big">– –</div>
-  <div id="detail">Noch keine Taste gedrückt</div>
+  <div id="detail">Noch nichts empfangen</div>
 
+  <button id="mediaBtn" class="btn">▶︎ Uhr-Test: Mediensteuerung starten</button>
+  <p class="hint">Danach auf der Uhr Weiter/Zurück/Play/Pause drücken – die Aktion erscheint im Log.</p>
+
+  <button class="clearbtn" id="clearBtn">Log leeren</button>
   <div id="log"></div>
 
-  <p class="hint">Tipp: Falls nichts passiert, hat der Klicker evtl. einen Umschalter
-     (iOS/Android oder Kamera/Musik). Probier die andere Stellung.</p>
+  <p class="hint">Legende: <span class="t-key">KEY</span> Taste ·
+     <span class="t-wheel">WHEEL</span> Wisch/Scroll · <span class="t-ptr">POINTER</span> Maus/Stift ·
+     <span class="t-touch">TOUCH</span> Finger · <span class="t-media">MEDIA</span> Uhr-Taste</p>
+  <p class="hint">Tipp: Falls beim Ring nichts erscheint, hat er evtl. einen Umschalter
+     (iOS/Android oder Kamera/Musik) – andere Stellung probieren.</p>
   <p class="hint"><a href="index.html">← zur Punktezähler-App</a></p>
 
   <script>
@@ -54,22 +73,78 @@
     const log = document.getElementById('log');
     let count = 0;
 
-    function show(e) {
-      e.preventDefault();
+    function add(tagClass, tagText, big1, detailHtml) {
       count++;
-      const key = e.key === ' ' ? 'Leertaste' : e.key;
-      big.textContent = key && key.length ? key : '(?)';
-      detail.innerHTML =
-        'key: <span>' + (e.key || '?') + '</span> &nbsp; ' +
-        'code: <span>' + (e.code || '?') + '</span> &nbsp; ' +
-        'keyCode: <span>' + (e.keyCode || '?') + '</span>';
+      if (big1) big.textContent = big1;
+      if (detailHtml) detail.innerHTML = detailHtml;
       const row = document.createElement('div');
-      row.textContent = '#' + count + '  key="' + e.key + '"  code="' + e.code + '"  keyCode=' + e.keyCode;
+      const t = new Date();
+      const hh = String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0') + ':' + String(t.getSeconds()).padStart(2, '0');
+      row.innerHTML = '<span class="tag ' + tagClass + '">' + tagText + '</span> ' + hh + '  ' + detailHtml;
       log.prepend(row);
     }
 
-    // keydown fängt die meisten Klicker; keyup als Reserve
-    window.addEventListener('keydown', show);
+    // --- Tastatur (Klicker als BT-Tastatur) ---
+    window.addEventListener('keydown', (e) => {
+      e.preventDefault();
+      const k = e.key === ' ' ? 'Leertaste' : (e.key || '?');
+      add('t-key', 'KEY',
+        k.length ? k : '(?)',
+        'key=<span>' + (e.key || '?') + '</span> code=<span>' + (e.code || '?') + '</span> keyCode=<span>' + (e.keyCode || '?') + '</span>');
+    });
+
+    // --- Wheel (Ring/Maus-Scroll). preventDefault: wenn die Seite TROTZDEM scrollt, ist es KEIN wheel-Event ---
+    window.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const dir = Math.abs(e.deltaX) > Math.abs(e.deltaY)
+        ? (e.deltaX < 0 ? '◀︎ links' : '▶︎ rechts')
+        : (e.deltaY < 0 ? '▲ hoch' : '▼ runter');
+      add('t-wheel', 'WHEEL', dir,
+        'deltaX=<span>' + Math.round(e.deltaX) + '</span> deltaY=<span>' + Math.round(e.deltaY) + '</span>');
+    }, { passive: false });
+
+    // --- Pointer (Maus/Stift) vs Touch (Finger) ---
+    window.addEventListener('pointerdown', (e) => {
+      add('t-ptr', 'POINTER', e.pointerType || 'pointer',
+        'pointerType=<span>' + (e.pointerType || '?') + '</span> button=<span>' + e.button + '</span>');
+    });
+    window.addEventListener('touchstart', () => {
+      add('t-touch', 'TOUCH', 'Finger', 'touches=<span>1+</span>');
+    }, { passive: true });
+
+    document.getElementById('clearBtn').addEventListener('click', () => { log.innerHTML = ''; count = 0; });
+
+    // --- Uhr-Test: stilles Loop-Audio + Media Session ---
+    const mediaBtn = document.getElementById('mediaBtn');
+    let audioEl = null, mediaOn = false;
+    function logMedia(name) { add('t-media', 'MEDIA', '⌚ ' + name, 'Aktion=<span>' + name + '</span>'); }
+    mediaBtn.addEventListener('click', () => {
+      if (!audioEl) {
+        audioEl = new Audio('silent.wav');
+        audioEl.loop = true;
+        audioEl.volume = 0.03;
+        audioEl.setAttribute('playsinline', '');
+      }
+      audioEl.play().then(() => {
+        mediaOn = true;
+        mediaBtn.classList.add('on');
+        mediaBtn.textContent = '⏹ Mediensteuerung läuft – jetzt Uhr-Tasten drücken';
+        if ('mediaSession' in navigator) {
+          try {
+            if (window.MediaMetadata) navigator.mediaSession.metadata = new MediaMetadata({ title: 'Pickleball Diagnose', artist: 'Uhr-Test' });
+            ['nexttrack','previoustrack','play','pause','seekforward','seekbackward','stop'].forEach((a) => {
+              try { navigator.mediaSession.setActionHandler(a, () => logMedia(a)); } catch (e) {}
+            });
+            navigator.mediaSession.playbackState = 'playing';
+          } catch (e) {}
+          add('t-media', 'MEDIA', '⌚ bereit', 'Mediensteuerung aktiv – drücke auf der Uhr Weiter/Zurück/Play/Pause');
+        } else {
+          add('t-media', 'MEDIA', 'nicht da', 'mediaSession wird von diesem Browser nicht unterstützt');
+        }
+      }).catch((err) => {
+        add('t-media', 'MEDIA', 'Fehler', 'Audio-Start blockiert: ' + (err && err.message ? err.message : err));
+      });
+    });
   </script>
 </body>
 </html>

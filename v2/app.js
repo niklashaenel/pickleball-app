@@ -181,14 +181,19 @@ let learning = null; // welcher Tasten-Slot gerade angelernt wird ('A'|'B'|'undo
    Persistenz
    ========================================================================= */
 function loadSettings() {
+  let s = null;
   try {
     const raw = JSON.parse(localStorage.getItem(KEY_SETTINGS));
-    if (raw) return Object.assign({}, DEFAULT_SETTINGS, raw,
+    if (raw) s = Object.assign({}, DEFAULT_SETTINGS, raw,
       { names:   Object.assign({}, DEFAULT_SETTINGS.names,   raw.names),
         keys:    Object.assign({}, DEFAULT_SETTINGS.keys,    raw.keys),
         tippers: Object.assign({}, DEFAULT_SETTINGS.tippers, raw.tippers) });
   } catch (e) { /* ignorieren */ }
-  return JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+  if (!s) s = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+  // Einmalige Migration: Ring- und Smartwatch-Steuerung standardmäßig aktivieren,
+  // auch bei bestehenden Installationen (die ein gespeichertes "aus" hätten).
+  if (!s.inputV2) { s.ringControl = true; s.watchControl = true; s.inputV2 = true; }
+  return s;
 }
 function saveSettings() { localStorage.setItem(KEY_SETTINGS, JSON.stringify(settings)); }
 
@@ -965,14 +970,22 @@ document.addEventListener('pointerdown', (e) => {
 function startMediaSession() {
   if (!settings.watchControl) return;
   const a = $('#silentAudio');
-  if (a) { try { a.volume = 0; if (a.paused) a.play().catch(() => {}); } catch (e) {} }
+  // iOS blendet Wiedergabe mit volume=0 oft aus der "Now Playing"-Steuerung aus
+  // (dann steuert die Uhr nichts). Daher ganz leise, aber NICHT null.
+  if (a) { try { a.volume = 0.03; if (a.paused) a.play().catch(() => {}); } catch (e) {} }
   if ('mediaSession' in navigator) {
     try {
       if (window.MediaMetadata) navigator.mediaSession.metadata = new MediaMetadata({ title: 'Pickleball', artist: 'Punktezähler' });
-      navigator.mediaSession.setActionHandler('nexttrack', () => { ensureAudio(); rallyWonBy('A'); });
-      navigator.mediaSession.setActionHandler('previoustrack', () => { ensureAudio(); rallyWonBy('B'); });
-      navigator.mediaSession.setActionHandler('play', () => { ensureAudio(); announce(undefined, true); });
-      navigator.mediaSession.setActionHandler('pause', () => { ensureAudio(); announce(undefined, true); });
+      const toA = () => { ensureAudio(); rallyWonBy('A'); };
+      const toB = () => { ensureAudio(); rallyWonBy('B'); };
+      const rep = () => { ensureAudio(); announce(undefined, true); };
+      navigator.mediaSession.setActionHandler('nexttrack', toA);
+      navigator.mediaSession.setActionHandler('previoustrack', toB);
+      navigator.mediaSession.setActionHandler('play', rep);
+      navigator.mediaSession.setActionHandler('pause', rep);
+      // Reserve: falls die Uhr Skip- statt Track-Tasten sendet
+      try { navigator.mediaSession.setActionHandler('seekforward', toA); } catch (e) {}
+      try { navigator.mediaSession.setActionHandler('seekbackward', toB); } catch (e) {}
       navigator.mediaSession.playbackState = 'playing';
     } catch (e) {}
   }
@@ -982,7 +995,7 @@ function stopMediaSession() {
   if (a) { try { a.pause(); } catch (e) {} }
   if ('mediaSession' in navigator) {
     try {
-      ['nexttrack', 'previoustrack', 'play', 'pause'].forEach((x) => navigator.mediaSession.setActionHandler(x, null));
+      ['nexttrack', 'previoustrack', 'play', 'pause', 'seekforward', 'seekbackward'].forEach((x) => { try { navigator.mediaSession.setActionHandler(x, null); } catch (e) {} });
       navigator.mediaSession.playbackState = 'none';
     } catch (e) {}
   }

@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=15" />
+  <link rel="stylesheet" href="styles.css?v=16" />
 </head>
 <body>
   <!-- Vollflächiger Farb-Blitz bei einem Punkt (aus Distanz sichtbar) -->
@@ -174,15 +174,15 @@
       </label>
 
       <label class="row">
-        <span>Ring-/Scroll-Steuerung <em class="onlyandroid">(nur Android)</em></span>
+        <span>Ring-/Scroll-Steuerung</span>
         <input type="checkbox" id="setRing" />
       </label>
 
       <label class="row">
-        <span>Smartwatch-Steuerung (Media) <em class="onlyandroid">(nur Android)</em></span>
+        <span>Smartwatch-Steuerung (Media)</span>
         <input type="checkbox" id="setWatch" />
       </label>
-      <p class="muted">Auf dem iPhone leitet iOS diese Befehle nicht an Web-Apps weiter – dort zählst du per Tippen auf die zwei Bildschirmhälften (oder den Tipper-Modus unten).</p>
+      <p class="muted">Wisch hoch = Punkt A, runter = Punkt B, Klick = Stand wiederholen. Für die Uhr: als Mediensteuerung koppeln und einmal in der App tippen, damit der Ton startet. <a href="tastentest.html">Diagnose-Seite</a> zeigt, was Ring/Uhr senden.</p>
 
       <label class="row">
         <span>Team A</span>
@@ -309,6 +309,6 @@
   <!-- Stilles Loop-Audio für die Smartwatch-Mediensteuerung -->
   <audio id="silentAudio" src="silent.wav" loop preload="auto" playsinline></audio>
 
-  <script src="app.js?v=15"></script>
+  <script src="app.js?v=16"></script>
 </body>
 </html>
