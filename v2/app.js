@@ -23,6 +23,7 @@ const DEFAULT_SETTINGS = {
   announceTeam: true,
   voiceURI: '',
   sound: true,
+  volume: 'laut',       // Lautstärke der Ansagen/Töne: 'normal' | 'laut' | 'sehr-laut'
   naturalVoice: true,   // vorab erzeugte natürliche Audio-Schnipsel verwenden, wenn vorhanden
   ringControl: false,   // Bluetooth-Ring (Mausrad/Scroll)
   watchControl: false,  // Smartwatch über Media Session
@@ -748,6 +749,8 @@ async function speakKeysOrText(keys, fallbackText) {
   speakText(fallbackText);
 }
 
+// Doppel-Paar (zwei Personen) -> Plural "gewinnen", sonst "gewinnt" ("Team A gewinnt")
+function winnerVerb() { return parsePlayers(teamName(game.winner)).length >= 2 ? 'gewinnen' : 'gewinnt'; }
 async function announce(event, force) {
   if (!settings.announce && !force) return;
   const phrases = [];
@@ -761,7 +764,7 @@ async function announce(event, force) {
       phrases.push('Satzstand ' + say(match.A) + ' zu ' + say(match.B));
     } else {
       phrases.push('Spiel');
-      phrases.push(wName + ' gewinnt');
+      phrases.push(wName + ' ' + winnerVerb());
     }
   } else {
     if (event === 'sideout') {
@@ -850,6 +853,21 @@ function ensureAudio() {
   } catch (e) {}
   return audioCtx;
 }
+// ---- Lautstärke: Master-GainNode, durch den alle Töne/Schnipsel laufen ----
+const VOLUME_GAIN = { normal: 1.0, laut: 1.6, 'sehr-laut': 2.3 };
+let masterGain = null;
+// Gibt den Master-Gain-Knoten zurück (an Ausgang gekoppelt) und stellt die aktuelle Lautstärke ein.
+function masterNode() {
+  const ctx = ensureAudio();
+  if (!ctx) return null;
+  if (!masterGain || masterGain.context !== ctx) {
+    masterGain = ctx.createGain();
+    masterGain.connect(ctx.destination);
+  }
+  const g = VOLUME_GAIN[settings.volume];
+  masterGain.gain.value = (g != null) ? g : 1.6;
+  return masterGain;
+}
 function beep(freq, durMs, type, when) {
   const ctx = ensureAudio();
   if (!ctx) return;
@@ -862,7 +880,7 @@ function beep(freq, durMs, type, when) {
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(0.3, t + 0.012);
     g.gain.exponentialRampToValueAtTime(0.0001, t + durMs / 1000);
-    o.connect(g); g.connect(ctx.destination);
+    o.connect(g); g.connect(masterNode() || ctx.destination);
     o.start(t); o.stop(t + durMs / 1000 + 0.03);
   } catch (e) {}
 }
@@ -885,7 +903,7 @@ function undoTone() { ensureAudio(); beep(440, 90, 'sine', 0); beep(300, 130, 's
 // ---- Natürliche Audio-Schnipsel (vorab mit edge-tts erzeugt) ----
 const CLIP_KEYS = new Set([
   ...Array.from({ length: 31 }, (_, i) => String(i)),
-  'zu', 'seitenwechsel', 'verlaengerung', 'es-geht-bis', 'aufschlag', 'spiel', 'gewinnt',
+  'zu', 'seitenwechsel', 'verlaengerung', 'es-geht-bis', 'aufschlag', 'spiel', 'gewinnt', 'gewinnen',
   'spiel-fuer', 'satzstand', 'match', 'gewinnt-das-match', 'team-a', 'team-b'
 ]);
 let clipsAvailable = false;
@@ -955,7 +973,7 @@ function playEntries(entries) {
     const dur = isLast ? Math.min(en.buf.duration - en.offset, en.dur + 0.25) : en.dur;
     const src = ctx.createBufferSource();
     src.buffer = en.buf;
-    src.connect(ctx.destination);
+    src.connect(masterNode() || ctx.destination);
     src.start(t, en.offset, dur);
     clipNodes.push(src);
     t += dur + GAP;
@@ -979,7 +997,7 @@ function buildClipKeys(event) {
     } else if (settings.matchBestOf > 1) {
       keys.push('spiel-fuer'); team(game.winner); keys.push('satzstand'); num(match.A); keys.push('zu'); num(match.B);
     } else {
-      keys.push('spiel'); team(game.winner); keys.push('gewinnt');
+      keys.push('spiel'); team(game.winner); keys.push(winnerVerb());
     }
   } else {
     if (event === 'sideout') {
@@ -1033,7 +1051,7 @@ function buildPhraseKeys(event) {
       return ['match', tk, 'gewinnt-das-match'];
     }
     if (settings.matchBestOf > 1) return null; // "Spiel für ..., Satzstand ..." -> Wort-Fallback
-    return ['spiel', tk, 'gewinnt'];
+    return ['spiel', tk, winnerVerb()];
   }
   const nums = callText();
   if (nums[0] > 21 || nums[1] > 21) return null; // außerhalb des erzeugten Bereichs
@@ -1189,13 +1207,14 @@ function updateSwipeLayer() {
 updateSwipeLayer();
 
 // ---- #2 Smartwatch-/Ring-Steuerung (Media Session) ----
-// Ganz einfach & zuverlässig (kein Doppel-Tipp, KEIN Undo auf der Uhr):
+// Ganz einfach & zuverlässig (kein Doppel-Tipp):
 //   oben/next ODER rechts/seekforward = Punkt A
 //   unten/previoustrack               = Punkt B
 //   Mitte/Play-Pause                  = Stand ansagen
-// Vertippt? Am Handy mit ↩︎ zurücknehmen.
+//   links/seekbackward                = Undo (letzten Punkt zurücknehmen)
 const MID_MS = 1000;   // Entprellen der Mitte-Ansage (kein Gestotter bei Doppel-Signalen)
 let lastMiddlePress = 0;
+let lastUndoPress = 0;
 function onMediaA() { ensureAudio(); rallyWonBy('A'); }
 function onMediaB() { ensureAudio(); rallyWonBy('B'); }
 function onMediaMiddle() {
@@ -1206,6 +1225,14 @@ function onMediaMiddle() {
   if (now - lastMiddlePress < MID_MS) return;
   lastMiddlePress = now;
   announce(undefined, true);
+}
+function onMediaUndo() {
+  // links = Undo. Entprellt, damit ein Doppel-Signal der Uhr nicht zwei Punkte zurücknimmt.
+  ensureAudio();
+  const now = Date.now();
+  if (now - lastUndoPress < MID_MS) return;
+  lastUndoPress = now;
+  undo();
 }
 function startMediaSession() {
   if (!settings.watchControl) return;
@@ -1221,7 +1248,7 @@ function startMediaSession() {
       navigator.mediaSession.setActionHandler('play', onMediaMiddle);       // Mitte = ansagen
       navigator.mediaSession.setActionHandler('pause', onMediaMiddle);
       try { navigator.mediaSession.setActionHandler('seekforward', onMediaA); } catch (e) {} // rechts = A
-      // seekbackward (links) bewusst NICHT belegt
+      try { navigator.mediaSession.setActionHandler('seekbackward', onMediaUndo); } catch (e) {} // links = Undo
       navigator.mediaSession.playbackState = 'playing';
     } catch (e) {}
   }
@@ -1300,6 +1327,7 @@ function openSettings() {
   $('#setStartChooser').checked = settings.showStartChooser;
   $('#setAnnounce').checked = settings.announce;
   $('#setSound').checked = settings.sound;
+  $('#setVolume').value = settings.volume || 'laut';
   $('#setWatch').checked = settings.watchControl;
   $('#setSwipe').checked = settings.swipeControl;
   $('#setAnnounceTeam').checked = settings.announceTeam;
@@ -1362,6 +1390,7 @@ $('#statsExport').addEventListener('click', exportMatches);
 $('#statsImport').addEventListener('click', () => $('#statsImportFile').click());
 $('#statsImportFile').addEventListener('change', (e) => { if (e.target.files && e.target.files[0]) importMatches(e.target.files[0]); });
 $('#setSound').addEventListener('change', (e) => { settings.sound = e.target.checked; saveSettings(); if (settings.sound) soundFor('point'); });
+$('#setVolume').addEventListener('change', (e) => { settings.volume = e.target.value; saveSettings(); masterNode(); beep(880, 110, 'triangle'); });
 $('#setWatch').addEventListener('change', (e) => { settings.watchControl = e.target.checked; saveSettings(); if (settings.watchControl) startMediaSession(); else stopMediaSession(); });
 $('#setSwipe').addEventListener('change', (e) => { settings.swipeControl = e.target.checked; saveSettings(); updateSwipeLayer(); });
 $('#setAnnounce').addEventListener('change', (e) => { settings.announce = e.target.checked; saveSettings(); render(); });

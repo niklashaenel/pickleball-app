@@ -3,9 +3,9 @@
 // den Cache-Speicher über alle Pfade -> wir räumen NUR unsere eigene Familie auf, damit die
 // alte App im Root ihren Offline-Cache behält.
 const CACHE_PREFIX = 'pickleball-v2-';
-const CACHE = CACHE_PREFIX + '19';
+const CACHE = CACHE_PREFIX + '20';
 const VOICE = [
-  'zu', 'seitenwechsel', 'verlaengerung', 'es-geht-bis', 'aufschlag', 'spiel', 'gewinnt',
+  'zu', 'seitenwechsel', 'verlaengerung', 'es-geht-bis', 'aufschlag', 'spiel', 'gewinnt', 'gewinnen',
   'spiel-fuer', 'satzstand', 'match', 'gewinnt-das-match', 'team-a', 'team-b'
 ];
 const ASSETS = [

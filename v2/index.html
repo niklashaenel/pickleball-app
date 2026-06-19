@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Rajdhani:wght@500;600;700&family=Cinzel:wght@600;700&family=Playfair+Display:wght@600;700;900&family=Great+Vibes&family=Poppins:wght@400;500;600&family=Anton&family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=33" />
+  <link rel="stylesheet" href="styles.css?v=34" />
 </head>
 <body>
   <!-- Vollflächiger Farb-Blitz bei einem Punkt (aus Distanz sichtbar) -->
@@ -93,7 +93,8 @@
     <form method="dialog" class="settings">
       <h2>Einstellungen</h2>
 
-      <h3 class="setgroup">Spiel</h3>
+      <details class="setgroup" open>
+      <summary>Spiel</summary>
       <label class="row">
         <span>Spielform</span>
         <select id="setMode">
@@ -140,8 +141,10 @@
         <span>Aufschlag-Auswahl beim Start zeigen</span>
         <input type="checkbox" id="setStartChooser" />
       </label>
+      </details>
 
-      <h3 class="setgroup">Ansage</h3>
+      <details class="setgroup">
+      <summary>Ansage</summary>
       <label class="row">
         <span>Spielstand vorlesen</span>
         <input type="checkbox" id="setAnnounce" />
@@ -157,13 +160,26 @@
         <input type="checkbox" id="setSound" />
       </label>
 
-      <h3 class="setgroup">Design</h3>
+      <label class="row">
+        <span>Lautstärke</span>
+        <select id="setVolume">
+          <option value="normal">Normal</option>
+          <option value="laut">Laut</option>
+          <option value="sehr-laut">Sehr laut</option>
+        </select>
+      </label>
+      </details>
+
+      <details class="setgroup">
+      <summary>Design</summary>
       <p class="muted">Stil wählen – tippe auf eine Vorschau.</p>
       <div id="themeGrid" class="theme-grid"></div>
       <p class="muted">Farben (optional – wirken über jeden Stil):</p>
       <div id="paletteGrid" class="palette-grid"></div>
+      </details>
 
-      <h3 class="setgroup">Steuerung</h3>
+      <details class="setgroup">
+      <summary>Steuerung</summary>
       <label class="row">
         <span>Smartwatch-Steuerung (Media)</span>
         <input type="checkbox" id="setWatch" />
@@ -178,9 +194,11 @@
         <span>Seiten tauschen (Team A rechts)</span>
         <input type="checkbox" id="setSwap" />
       </label>
-      <p class="muted">Eingabe: <strong>Tippen</strong> auf die Hälften zählt A/B. <strong>Wisch-Steuerung</strong> an → hoch = Punkt A, runter = Punkt B, seitlich oder lang drücken = Undo, kurz tippen = Stand wiederholen. <strong>Ring/Uhr</strong>: oben/vor oder rechts = Punkt A, unten = Punkt B, Mitte = Stand ansagen. (Als Mediensteuerung koppeln, einmal in der App tippen, damit der Ton startet. Vertippt? Oben mit ↩︎ zurück.) <a href="tastentest.html">Diagnose-Seite</a> zeigt, was Ring/Uhr senden.</p>
+      <p class="muted">Eingabe: <strong>Tippen</strong> auf die Hälften zählt A/B. <strong>Wisch-Steuerung</strong> an → hoch = Punkt A, runter = Punkt B, seitlich oder lang drücken = Undo, kurz tippen = Stand wiederholen. <strong>Ring/Uhr</strong>: oben/vor oder rechts = Punkt A, unten = Punkt B, Mitte = Stand ansagen, links = Undo. (Als Mediensteuerung koppeln, einmal in der App tippen, damit der Ton startet.) <a href="tastentest.html">Diagnose-Seite</a> zeigt, was Ring/Uhr senden.</p>
+      </details>
 
-      <h3 class="setgroup">Teams</h3>
+      <details class="setgroup">
+      <summary>Teams</summary>
       <label class="row">
         <span>Team A</span>
         <span class="rowctl">
@@ -204,8 +222,10 @@
           <button type="button" id="flipServer" class="ghost">Server 1/2</button>
         </div>
       </details>
+      </details>
 
-      <h3 class="setgroup">Gruppen &amp; Speichern</h3>
+      <details class="setgroup">
+      <summary>Gruppen &amp; Speichern</summary>
       <label class="row">
         <span>Aktive Gruppe</span>
         <select id="setActiveGroup"></select>
@@ -232,8 +252,10 @@
         <p class="muted">Für Online-Gruppen brauchst du einen eigenen, kostenlosen Cloudflare-Worker. Anleitung: <code>CLOUDFLARE.md</code> im Projekt. Danach hier die Worker-URL eintragen.</p>
         <input type="text" id="setWorkerBase" placeholder="https://dein-worker.workers.dev" style="width:100%" />
       </details>
+      </details>
 
-      <h3 class="setgroup">Daten</h3>
+      <details class="setgroup">
+      <summary>Daten</summary>
       <div class="row">
         <span>Verlauf gespielter Spiele</span>
         <button type="button" id="historyBtn" class="ghost small">Ansehen</button>
@@ -243,6 +265,7 @@
         <span>Statistik &amp; Bestenliste</span>
         <button type="button" id="statsBtn" class="ghost small">Ansehen</button>
       </div>
+      </details>
 
       <hr />
       <div class="btnrow">
@@ -304,6 +327,6 @@
   <!-- Stilles Loop-Audio für die Smartwatch-Mediensteuerung -->
   <audio id="silentAudio" src="silent.wav" loop preload="auto" playsinline></audio>
 
-  <script src="app.js?v=33"></script>
+  <script src="app.js?v=34"></script>
 </body>
 </html>

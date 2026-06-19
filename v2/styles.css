@@ -230,6 +230,18 @@ button { font-family: var(--font-ui); }
 /* Gruppen-Überschriften mit dezenter Trennlinie */
 .settings h3.setgroup { margin-top: 1.15rem; padding-top: .8rem; border-top: 1px solid var(--line); }
 .settings h3.setgroup:first-of-type { margin-top: .4rem; padding-top: 0; border-top: none; }
+/* Ausklappbare Haupt-Gruppen (Spiel, Ansage, Design, ...) */
+.settings details.setgroup { margin: 0; border-top: 1px solid var(--line); }
+.settings details.setgroup:first-of-type { border-top: none; }
+.settings details.setgroup > summary {
+  cursor: pointer; list-style: none; margin: 0; padding: .85rem 0;
+  color: var(--cyan); font-size: 1.05rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .06em;
+}
+.settings details.setgroup > summary::-webkit-details-marker { display: none; }
+.settings details.setgroup > summary::before { content: "\25B8  "; color: var(--gold); font-size: .9em; }
+.settings details.setgroup[open] > summary::before { content: "\25BE  "; }
+.settings details.setgroup[open] { padding-bottom: .7rem; }
 /* Einklappbarer Bereich ("Manuell korrigieren") */
 .setdetails { margin: 1rem 0; border: 1px solid var(--line); border-radius: .6rem; padding: 0 .7rem; }
 .setdetails > summary { cursor: pointer; padding: .65rem 0; color: var(--cyan); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; font-size: .95rem; list-style: none; }
