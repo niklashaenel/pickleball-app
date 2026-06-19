@@ -23,7 +23,9 @@ const DEFAULT_SETTINGS = {
   announceTeam: true,
   voiceURI: '',
   sound: true,
-  volume: 'laut',       // Lautstärke der Ansagen/Töne: 'normal' | 'laut' | 'sehr-laut'
+  volume: 'laut',       // Lautstärke der Ansagen/Töne: 'normal' | 'laut' | 'sehr-laut' | 'maximal'
+  callStyle: 'natur',   // Ansage-Stil: 'natur' ("eins zu eins, zwei") | 'ziffern' ("null null eins")
+  announceServer: false,// bei jedem Punkt zusätzlich "Aufschlag <Name>" ansagen
   naturalVoice: true,   // vorab erzeugte natürliche Audio-Schnipsel verwenden, wenn vorhanden
   ringControl: false,   // Bluetooth-Ring (Mausrad/Scroll)
   watchControl: false,  // Smartwatch über Media Session
@@ -31,6 +33,8 @@ const DEFAULT_SETTINGS = {
   matchBestOf: 1,   // 1 = Einzelspiel, 3 = Best of 3, 5 = Best of 5
   startServer: 'A', // welches Team zuerst aufschlägt
   showStartChooser: true, // Aufschlag-Auswahl beim Spielstart zeigen
+  alternateServe: true,   // nächstes Spiel automatisch anderes Team aufschlagen lassen
+  lastStartServer: '',    // welches Team im letzten Spiel begonnen hat (für Auto-Wechsel)
   swapSides: false,
   theme: 'neon',     // Design-Stil
   palette: 'auto',   // Farbpalette ('auto' = Farben des Designs)
@@ -38,7 +42,8 @@ const DEFAULT_SETTINGS = {
   activeGroup: 'local',   // Spiele landen in dieser Gruppe
   autoSave: true,         // beendete Spiele automatisch speichern
   workerBase: '',         // URL des eigenen Cloudflare-Workers (leer = Online aus)
-  names: { A: 'Team A', B: 'Team B' }
+  names: { A: 'Team A', B: 'Team B' },
+  roster: { A: [], B: [] } // geordnete Spieler je Team (Spieler 1 startet rechts) - für Aufschläger-Name
 };
 
 // Feste Tastatur-Kürzel (unsichtbarer Desktop-Komfort): A/B zählen, Undo, Wiederholen
@@ -415,8 +420,12 @@ function loadSettings() {
 function saveSettings() { localStorage.setItem(KEY_SETTINGS, JSON.stringify(settings)); }
 
 function loadGame() {
-  try { return JSON.parse(localStorage.getItem(KEY_GAME)); }
-  catch (e) { return null; }
+  try {
+    const g = JSON.parse(localStorage.getItem(KEY_GAME));
+    if (g && typeof g.srvEven === 'undefined') g.srvEven = true;     // Migration: Aufschläger-Position
+    if (g && !g.players) g.players = { A: rosterOf('A'), B: rosterOf('B') };
+    return g;
+  } catch (e) { return null; }
 }
 function saveGame() { localStorage.setItem(KEY_GAME, JSON.stringify(game)); }
 
@@ -429,6 +438,11 @@ function newGame() {
     serving: settings.startServer || 'A',
     // Doppel startet als "2. Aufschläger" -> Ruf 0-0-2; Einzel hat keine Servernummer
     server: settings.mode === 'doubles' ? 2 : 1,
+    // Aufschläger-Position: srvEven = aktueller Aufschläger ist der "gerade-Court"-Spieler (Spieler 1,
+    // steht bei geradem Team-Stand rechts). Spielstart 0-0 (gerade) -> rechts -> Spieler 1.
+    srvEven: true,
+    // Roster fürs ganze Spiel einfrieren (Reihenfolge: [gerade-Court, ungerade-Court])
+    players: { A: rosterOf('A'), B: rosterOf('B') },
     over: false,
     winner: null,
     counted: false
@@ -453,11 +467,14 @@ function rallyWonBy(team) {
     // Aufschlagteam verliert -> Fehler
     if (settings.mode === 'doubles' && game.server === 1) {
       game.server = 2;
+      game.srvEven = !game.srvEven; // 2. Aufschläger = Partner
       event = 'secondServer';
       flash('2. Aufschläger');
     } else {
       game.serving = other(game.serving);
       game.server = 1;
+      // Neuer Aufschläger ist der Spieler auf der rechten Seite -> gerade-Court-Spieler bei geradem Stand
+      game.srvEven = (game.scores[game.serving] % 2 === 0);
       event = 'sideout';
       flash('Seitenwechsel');
     }
@@ -518,24 +535,38 @@ function undo() {
   undoTone(); // kleiner Bestätigungston beim Zurücknehmen
   saveGame();
   render();
+  announce(undefined, true); // neuen Stand nach der Rücknahme ansagen (z.B. von 1-4-1 zurück -> "0-4-1")
 }
 
+// Startaufschlag fürs nächste Spiel: bei "automatisch abwechseln" anderes Team als zuletzt.
+// Gibt true zurück, wenn automatisch gewechselt wurde (dann keinen Chooser zeigen).
+function prepareNextStarter() {
+  if (settings.alternateServe && settings.lastStartServer) {
+    settings.startServer = other(settings.lastStartServer);
+    settings.lastStartServer = settings.startServer;
+    saveSettings();
+    return true;
+  }
+  return false;
+}
 function resetGame() {
+  const auto = prepareNextStarter();
   history = [];
   game = newGame();
   match = { A: 0, B: 0 };
   saveMatch();
   saveGame();
-  startChosen = false;
+  startChosen = auto;     // bei Auto-Wechsel keinen "Wer beginnt?"-Dialog zeigen
   hide('winner');
   render();
 }
 // Nächstes Spiel im Match (Satzstand bleibt erhalten)
 function nextGame() {
+  const auto = prepareNextStarter();
   history = [];
   game = newGame();
   saveGame();
-  startChosen = false;
+  startChosen = auto;
   hide('winner');
   render();
 }
@@ -551,6 +582,7 @@ function applyStartServer() {
 function coinToss() {
   ensureAudio();
   settings.startServer = Math.random() < 0.5 ? 'A' : 'B';
+  settings.lastStartServer = settings.startServer; // für Auto-Wechsel im nächsten Spiel
   saveSettings();
   const sel = document.querySelector('#setStartServer');
   if (sel) sel.value = settings.startServer;
@@ -624,8 +656,11 @@ function callText() {
 }
 
 function serveSide(team) {
-  // Aufschlag von rechts bei geradem eigenen Punktestand, sonst links
-  return game.scores[team] % 2 === 0 ? 'rechts' : 'links';
+  // Aufschlag von rechts bei geradem eigenen Punktestand (gerade-Court-Spieler), sonst links.
+  // Beim aufschlagenden Team zusätzlich srvEven berücksichtigen (2. Aufschläger = Partner = andere Seite).
+  const even = game.scores[team] % 2 === 0;
+  const onRight = (team === game.serving && game.srvEven === false) ? !even : even;
+  return onRight ? 'rechts' : 'links';
 }
 
 function render() {
@@ -698,7 +733,9 @@ function render() {
   // Start-Aufschlag-Auswahl (nur bei frischem Spiel, wenn Intro nicht offen ist)
   const fresh = !game.over && game.scores.A === 0 && game.scores.B === 0 && !history.length;
   const introHidden = $('#intro').classList.contains('hidden');
-  const showChooser = fresh && introHidden && settings.showStartChooser && !startChosen;
+  // Bei Auto-Wechsel (und vorhandenem letzten Starter) keinen Dialog mehr zeigen
+  const autoServe = settings.alternateServe && settings.lastStartServer;
+  const showChooser = fresh && introHidden && settings.showStartChooser && !startChosen && !autoServe;
   const ss = $('#startServe');
   ss.classList.toggle('hidden', !showChooser);
   if (showChooser) {
@@ -730,6 +767,12 @@ function hide(id) { $('#' + id).classList.add('hidden'); }
 // aber ohne große Lücken wie bei getrennten Ansagen.
 function scorePhrase() {
   const nums = callText(); // [sv, rc] oder [sv, rc, server]
+  if (settings.callStyle === 'ziffern') {
+    // Reine Ziffern, z.B. "null null eins" (= 0 0 1) - Leerzeichen = kurze Pausen
+    return settings.mode === 'doubles'
+      ? say(nums[0]) + ' ' + say(nums[1]) + ' ' + say(nums[2])
+      : say(nums[0]) + ' ' + say(nums[1]);
+  }
   if (settings.mode === 'doubles') {
     // Klingt wie eine Spielstand-Ansage, z.B. "drei zu null, zwei" (= 3 0 2)
     return say(nums[0]) + ' zu ' + say(nums[1]) + ', ' + say(nums[2]);
@@ -778,6 +821,9 @@ async function announce(event, force) {
     const a = game.scores.A, b = game.scores.B;
     if (event === 'point' && settings.winBy2 && a === b && a >= settings.target - 1) {
       phrases.push('Verlängerung, es geht bis ' + say(a + 2));
+    }
+    if (settings.announceServer) {
+      phrases.push('Aufschlag ' + speakName(servingPlayerName()));
     }
   }
   stopVoice();
@@ -853,16 +899,25 @@ function ensureAudio() {
   } catch (e) {}
   return audioCtx;
 }
-// ---- Lautstärke: Master-GainNode, durch den alle Töne/Schnipsel laufen ----
-const VOLUME_GAIN = { normal: 1.0, laut: 1.6, 'sehr-laut': 2.3 };
+// ---- Lautstärke: Master-GainNode + Limiter, durch den alle Töne/Schnipsel laufen ----
+const VOLUME_GAIN = { normal: 1.0, laut: 1.6, 'sehr-laut': 2.3, maximal: 3.8 };
 let masterGain = null;
-// Gibt den Master-Gain-Knoten zurück (an Ausgang gekoppelt) und stellt die aktuelle Lautstärke ein.
+let masterLimiter = null;
+// Kette: Quelle -> masterGain (Boost) -> Limiter (verhindert hartes Clipping) -> Ausgang.
+// Der Limiter erlaubt hohen Gain (laut auf BT-Lautsprechern) ohne übles Verzerren.
 function masterNode() {
   const ctx = ensureAudio();
   if (!ctx) return null;
   if (!masterGain || masterGain.context !== ctx) {
     masterGain = ctx.createGain();
-    masterGain.connect(ctx.destination);
+    masterLimiter = ctx.createDynamicsCompressor();
+    masterLimiter.threshold.value = -8;   // ab hier begrenzen
+    masterLimiter.knee.value = 0;
+    masterLimiter.ratio.value = 20;       // hohe Ratio = Limiter
+    masterLimiter.attack.value = 0.003;
+    masterLimiter.release.value = 0.25;
+    masterGain.connect(masterLimiter);
+    masterLimiter.connect(ctx.destination);
   }
   const g = VOLUME_GAIN[settings.volume];
   masterGain.gain.value = (g != null) ? g : 1.6;
@@ -1005,14 +1060,23 @@ function buildClipKeys(event) {
       if (settings.announceTeam) { keys.push('aufschlag'); team(game.serving); }
     }
     const nums = callText();
-    num(nums[0]); keys.push('zu'); num(nums[1]);
+    if (settings.callStyle === 'ziffern') {
+      num(nums[0]); num(nums[1]);                 // "null null eins" (keine "zu")
+    } else {
+      num(nums[0]); keys.push('zu'); num(nums[1]);
+    }
     if (settings.mode === 'doubles') num(nums[2]);
     const a = game.scores.A, b = game.scores.B;
     if (event === 'point' && settings.winBy2 && a === b && a >= settings.target - 1) {
       keys.push('verlaengerung'); keys.push('es-geht-bis'); num(a + 2);
     }
+    if (settings.announceServer) {                 // "... Aufschlag <Name>"
+      keys.push('aufschlag');
+      const sk = servingPlayerKey();
+      if (sk) keys.push(sk); else bad = true;      // unbekannter Name -> Geräte-Stimme
+    }
   }
-  if (bad || !keys.every((k) => CLIP_KEYS.has(k))) return null;
+  if (bad || !keys.every((k) => CLIP_KEYS.has(k) || k.startsWith('name_'))) return null;
   return keys;
 }
 
@@ -1042,6 +1106,31 @@ function teamClipKey(t) {
   return clubNameKey(nm);
 }
 
+// ---- Aufschläger nach Name (volle Positions-Logik) ----
+// Geordnete Spieler eines Teams ([gerade-Court, ungerade-Court]); Fallback aus dem Anzeige-Namen.
+function rosterOf(team) {
+  const r = (settings.roster && settings.roster[team]) || [];
+  const list = r.filter(Boolean);
+  if (list.length) return list.slice(0, 2);
+  return parsePlayers(teamName(team)).slice(0, 2);
+}
+// Aktuell aufschlagender Spieler: gerade-Court-Spieler (Spieler 1) wenn srvEven, sonst Partner.
+function servingPlayerName() {
+  const team = game.serving;
+  const pl = (game.players && game.players[team] && game.players[team].length)
+    ? game.players[team] : rosterOf(team);
+  if (settings.mode !== 'doubles') return pl[0] || teamName(team);
+  if (pl.length < 2) return pl[0] || teamName(team);
+  return game.srvEven ? pl[0] : pl[1];
+}
+// Clip-Schlüssel für den Aufschläger-Namen (Vereinsspieler), sonst null -> Geräte-Stimme.
+function servingPlayerKey() {
+  const nm = servingPlayerName();
+  if (!nm) return null;
+  const s = slug(nm);
+  return CLUB_SLUGS.has(s) ? ('name_' + s) : null;
+}
+
 // Volle Ansage-Schnipsel bevorzugen (ganze Phrasen = natürliche Betonung)
 function buildPhraseKeys(event) {
   if (game.over) {
@@ -1053,6 +1142,7 @@ function buildPhraseKeys(event) {
     if (settings.matchBestOf > 1) return null; // "Spiel für ..., Satzstand ..." -> Wort-Fallback
     return ['spiel', tk, winnerVerb()];
   }
+  if (settings.callStyle === 'ziffern') return null; // Ziffern-Stil -> Wort-Schnipsel (buildClipKeys)
   const nums = callText();
   if (nums[0] > 21 || nums[1] > 21) return null; // außerhalb des erzeugten Bereichs
   const call = settings.mode === 'doubles'
@@ -1076,6 +1166,11 @@ function buildPhraseKeys(event) {
   if (event === 'point' && settings.winBy2 && a === b && a >= settings.target - 1) {
     if (a + 2 <= 30) keys.push('verlaengerung', 'es-geht-bis', String(a + 2));
     else return null;
+  }
+  if (settings.announceServer) {                  // "... Aufschlag <Name>"
+    const sk = servingPlayerKey();
+    if (!sk) return null;                          // unbekannter Name -> Wort-Fallback/Stimme
+    keys.push('aufschlag', sk);
   }
   return keys;
 }
@@ -1105,13 +1200,25 @@ function teamFromSelects(team) {
   else if (players.length === 1) name = players[0];
   else name = players.slice().sort((a, b) => slug(a).localeCompare(slug(b))).join(' + ');
   settings.names[team] = name;
+  // Geordnetes Roster merken (Spieler 1 zuerst = startet rechts) - für Aufschläger-Ansage
+  if (!settings.roster) settings.roster = { A: [], B: [] };
+  settings.roster[team] = players.slice();
   saveSettings();
+  // Roster auch im laufenden frischen Spiel aktualisieren (vor dem ersten Punkt)
+  if (game && game.players && game.scores.A === 0 && game.scores.B === 0 && !game.over) {
+    game.players[team] = rosterOf(team);
+    saveGame();
+  }
   render();
 }
-// Auswahl-Menüs auf den aktuellen Team-Namen einstellen
+// Auswahl-Menüs auf den aktuellen Team-Namen einstellen (Roster-Reihenfolge bevorzugen)
 function setSelectsFromName(team) {
-  const parts = teamName(team).split('+').map((s) => s.trim()).filter(Boolean);
-  const known = parts.filter((p) => CLUB_PLAYERS.indexOf(p) !== -1);
+  const r = (settings.roster && settings.roster[team]) || [];
+  let known = r.filter((p) => CLUB_PLAYERS.indexOf(p) !== -1);
+  if (!known.length) {
+    const parts = teamName(team).split('+').map((s) => s.trim()).filter(Boolean);
+    known = parts.filter((p) => CLUB_PLAYERS.indexOf(p) !== -1);
+  }
   document.querySelector('#set' + team + '1').value = known.length ? known[0] : ('Team ' + team);
   document.querySelector('#set' + team + '2').value = known.length >= 2 ? known[1] : '';
 }
@@ -1207,30 +1314,33 @@ function updateSwipeLayer() {
 updateSwipeLayer();
 
 // ---- #2 Smartwatch-/Ring-Steuerung (Media Session) ----
-// Ganz einfach & zuverlässig (kein Doppel-Tipp):
 //   oben/next ODER rechts/seekforward = Punkt A
 //   unten/previoustrack               = Punkt B
-//   Mitte/Play-Pause                  = Stand ansagen
-//   links/seekbackward                = Undo (letzten Punkt zurücknehmen)
-const MID_MS = 1000;   // Entprellen der Mitte-Ansage (kein Gestotter bei Doppel-Signalen)
+//   Mitte/Play-Pause 1×               = Stand ansagen
+//   Mitte/Play-Pause gleich nochmal   = letzten Punkt zurücknehmen (+ neuen Stand ansagen)
+//   links/seekbackward                = Undo (falls die Uhr diese Taste überhaupt sendet)
+const ECHO_MS = 250;   // < dies = Doppelsignal der Uhr pro physischem Druck -> ignorieren
+const UNDO_MS = 2000;  // bewusster zweiter Druck innerhalb dieses Fensters = Undo
 let lastMiddlePress = 0;
 let lastUndoPress = 0;
 function onMediaA() { ensureAudio(); rallyWonBy('A'); }
 function onMediaB() { ensureAudio(); rallyWonBy('B'); }
 function onMediaMiddle() {
-  // Mitte/Play-Pause = Stand ansagen. Entprellt, damit schnelle Folge-Tipps
-  // (oder Doppel-Signale der Uhr pro Druck) die Ansage nicht ständig neu starten.
+  // 1. Druck = ansagen; schneller 2. Druck = Undo. Das Doppelsignal der Uhr (sehr kurz
+  // hintereinander) wird ausgefiltert, damit es nicht versehentlich einen Punkt zurücknimmt.
   ensureAudio();
   const now = Date.now();
-  if (now - lastMiddlePress < MID_MS) return;
+  const dt = now - lastMiddlePress;
   lastMiddlePress = now;
-  announce(undefined, true);
+  if (dt < ECHO_MS) return;            // Uhr-Echo desselben Drucks
+  if (dt < UNDO_MS) { undo(); return; } // bewusster zweiter Druck -> Punkt zurück (undo() sagt an)
+  announce(undefined, true);            // einzelner Druck -> Stand ansagen
 }
 function onMediaUndo() {
-  // links = Undo. Entprellt, damit ein Doppel-Signal der Uhr nicht zwei Punkte zurücknimmt.
+  // links = Undo (Bonus, falls die Uhr seekbackward sendet). Entprellt gegen Doppelsignal.
   ensureAudio();
   const now = Date.now();
-  if (now - lastUndoPress < MID_MS) return;
+  if (now - lastUndoPress < ECHO_MS) return;
   lastUndoPress = now;
   undo();
 }
@@ -1310,8 +1420,8 @@ $('#introOk').addEventListener('click', () => {
 $('#winnerClose').addEventListener('click', () => { game.over = false; saveGame(); hide('winner'); render(); });
 
 // Start-Aufschlag-Auswahl (Overlay zu Spielbeginn)
-$('#ssA').addEventListener('click', () => { settings.startServer = 'A'; saveSettings(); applyStartServer(); startChosen = true; render(); });
-$('#ssB').addEventListener('click', () => { settings.startServer = 'B'; saveSettings(); applyStartServer(); startChosen = true; render(); });
+$('#ssA').addEventListener('click', () => { settings.startServer = 'A'; settings.lastStartServer = 'A'; saveSettings(); applyStartServer(); startChosen = true; render(); });
+$('#ssB').addEventListener('click', () => { settings.startServer = 'B'; settings.lastStartServer = 'B'; saveSettings(); applyStartServer(); startChosen = true; render(); });
 $('#ssToss').addEventListener('click', coinToss);
 $('#ssStart').addEventListener('click', () => { startChosen = true; render(); });
 
@@ -1325,7 +1435,10 @@ function openSettings() {
   $('#setStartServer').options[1].text = teamName('B');
   $('#setStartServer').value = settings.startServer;
   $('#setStartChooser').checked = settings.showStartChooser;
+  $('#setAlternateServe').checked = settings.alternateServe;
   $('#setAnnounce').checked = settings.announce;
+  $('#setCallStyle').value = settings.callStyle || 'natur';
+  $('#setAnnounceServer').checked = settings.announceServer;
   $('#setSound').checked = settings.sound;
   $('#setVolume').value = settings.volume || 'laut';
   $('#setWatch').checked = settings.watchControl;
@@ -1349,8 +1462,11 @@ $('#setMode').addEventListener('change', (e) => {
 $('#setTarget').addEventListener('change', (e) => { settings.target = parseInt(e.target.value, 10); saveSettings(); });
 $('#setWinBy2').addEventListener('change', (e) => { settings.winBy2 = e.target.checked; saveSettings(); });
 $('#setMatch').addEventListener('change', (e) => { settings.matchBestOf = parseInt(e.target.value, 10); match = { A: 0, B: 0 }; saveMatch(); saveSettings(); render(); });
-$('#setStartServer').addEventListener('change', (e) => { settings.startServer = e.target.value; saveSettings(); applyStartServer(); render(); });
+$('#setStartServer').addEventListener('change', (e) => { settings.startServer = e.target.value; settings.lastStartServer = settings.startServer; saveSettings(); applyStartServer(); render(); });
 $('#setStartChooser').addEventListener('change', (e) => { settings.showStartChooser = e.target.checked; saveSettings(); render(); });
+$('#setAlternateServe').addEventListener('change', (e) => { settings.alternateServe = e.target.checked; saveSettings(); });
+$('#setCallStyle').addEventListener('change', (e) => { settings.callStyle = e.target.value; saveSettings(); });
+$('#setAnnounceServer').addEventListener('change', (e) => { settings.announceServer = e.target.checked; saveSettings(); });
 $('#coinTossBtn').addEventListener('click', coinToss);
 $('#historyBtn').addEventListener('click', async () => {
   $('#viewAllHist').checked = viewAllGroups; renderHistory(); document.querySelector('#historyDlg').showModal();

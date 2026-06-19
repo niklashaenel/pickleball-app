@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Rajdhani:wght@500;600;700&family=Cinzel:wght@600;700&family=Playfair+Display:wght@600;700;900&family=Great+Vibes&family=Poppins:wght@400;500;600&family=Anton&family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=34" />
+  <link rel="stylesheet" href="styles.css?v=35" />
 </head>
 <body>
   <!-- Vollflächiger Farb-Blitz bei einem Punkt (aus Distanz sichtbar) -->
@@ -141,6 +141,11 @@
         <span>Aufschlag-Auswahl beim Start zeigen</span>
         <input type="checkbox" id="setStartChooser" />
       </label>
+
+      <label class="row">
+        <span>Aufschlag automatisch abwechseln (nächstes Spiel)</span>
+        <input type="checkbox" id="setAlternateServe" />
+      </label>
       </details>
 
       <details class="setgroup">
@@ -148,6 +153,19 @@
       <label class="row">
         <span>Spielstand vorlesen</span>
         <input type="checkbox" id="setAnnounce" />
+      </label>
+
+      <label class="row">
+        <span>Ansage-Stil</span>
+        <select id="setCallStyle">
+          <option value="natur">Natürlich („eins zu eins, zwei")</option>
+          <option value="ziffern">Ziffern („null null eins")</option>
+        </select>
+      </label>
+
+      <label class="row">
+        <span>Aufschläger mit Namen ansagen</span>
+        <input type="checkbox" id="setAnnounceServer" />
       </label>
 
       <label class="row">
@@ -166,6 +184,7 @@
           <option value="normal">Normal</option>
           <option value="laut">Laut</option>
           <option value="sehr-laut">Sehr laut</option>
+          <option value="maximal">Maximal</option>
         </select>
       </label>
       </details>
@@ -194,7 +213,7 @@
         <span>Seiten tauschen (Team A rechts)</span>
         <input type="checkbox" id="setSwap" />
       </label>
-      <p class="muted">Eingabe: <strong>Tippen</strong> auf die Hälften zählt A/B. <strong>Wisch-Steuerung</strong> an → hoch = Punkt A, runter = Punkt B, seitlich oder lang drücken = Undo, kurz tippen = Stand wiederholen. <strong>Ring/Uhr</strong>: oben/vor oder rechts = Punkt A, unten = Punkt B, Mitte = Stand ansagen, links = Undo. (Als Mediensteuerung koppeln, einmal in der App tippen, damit der Ton startet.) <a href="tastentest.html">Diagnose-Seite</a> zeigt, was Ring/Uhr senden.</p>
+      <p class="muted">Eingabe: <strong>Tippen</strong> auf die Hälften zählt A/B. <strong>Wisch-Steuerung</strong> an → hoch = Punkt A, runter = Punkt B, seitlich oder lang drücken = Undo, kurz tippen = Stand wiederholen. <strong>Ring/Uhr</strong>: oben/vor = Punkt A, unten = Punkt B, Mitte = Stand ansagen, Mitte gleich nochmal (innerhalb ~2 s) = Punkt zurück. (Als Mediensteuerung koppeln, einmal in der App tippen, damit der Ton startet.) <a href="tastentest.html">Diagnose-Seite</a> zeigt, was Ring/Uhr senden.</p>
       </details>
 
       <details class="setgroup">
@@ -214,6 +233,7 @@
           <select id="setB2"></select>
         </span>
       </label>
+      <p class="muted">Spieler 1 startet rechts und schlägt zuerst auf (für die „Aufschlag &lt;Name&gt;"-Ansage).</p>
 
       <details class="setdetails">
         <summary>Manuell korrigieren</summary>
@@ -327,6 +347,6 @@
   <!-- Stilles Loop-Audio für die Smartwatch-Mediensteuerung -->
   <audio id="silentAudio" src="silent.wav" loop preload="auto" playsinline></audio>
 
-  <script src="app.js?v=34"></script>
+  <script src="app.js?v=35"></script>
 </body>
 </html>
