@@ -1142,12 +1142,13 @@ function buildPhraseKeys(event) {
     if (settings.matchBestOf > 1) return null; // "Spiel für ..., Satzstand ..." -> Wort-Fallback
     return ['spiel', tk, winnerVerb()];
   }
-  if (settings.callStyle === 'ziffern') return null; // Ziffern-Stil -> Wort-Schnipsel (buildClipKeys)
   const nums = callText();
   if (nums[0] > 21 || nums[1] > 21) return null; // außerhalb des erzeugten Bereichs
+  // Vollphrase je Stil: natürlich "d_/s_" ("a zu b, c"), Ziffern "dz_/sz_" ("a b c")
+  const ziff = settings.callStyle === 'ziffern';
   const call = settings.mode === 'doubles'
-    ? 'd_' + nums[0] + '_' + nums[1] + '_' + nums[2]
-    : 's_' + nums[0] + '_' + nums[1];
+    ? (ziff ? 'dz_' : 'd_') + nums[0] + '_' + nums[1] + '_' + nums[2]
+    : (ziff ? 'sz_' : 's_') + nums[0] + '_' + nums[1];
   const keys = [];
   if (event === 'sideout' && settings.announceTeam) {
     const nm = teamName(game.serving);
