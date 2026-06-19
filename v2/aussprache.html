@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Aussprache-Test – Namen</title>
+<style>
+  :root { --bg:#05060d; --surface:#0f1626; --line:rgba(0,229,255,.25); --text:#eaf6ff; --muted:#8aa6c0; --cyan:#00e5ff; --gold:#fdff6a; --sel:#1d6; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,sans-serif; padding:1rem 1rem 6rem; }
+  h1 { font-size:1.25rem; color:var(--cyan); margin:.2rem 0 .2rem; }
+  p.intro { color:var(--muted); margin:.2rem 0 1rem; font-size:.95rem; }
+  .card { background:var(--surface); border:1px solid var(--line); border-radius:.9rem; padding:.7rem .8rem; margin:.6rem 0; }
+  .name { font-weight:700; font-size:1.1rem; margin-bottom:.5rem; display:flex; align-items:center; gap:.5rem; }
+  .name .pick { font-size:.85rem; color:var(--gold); font-weight:600; }
+  .vars { display:grid; grid-template-columns:1fr 1fr; gap:.5rem; }
+  .var { display:flex; align-items:center; gap:.5rem; padding:.6rem .6rem; border:1.5px solid var(--line); border-radius:.6rem; background:rgba(0,229,255,.05); color:var(--text); font-size:1rem; cursor:pointer; text-align:left; }
+  .var .num { width:1.4rem; height:1.4rem; flex:0 0 auto; border-radius:50%; background:rgba(0,229,255,.18); color:var(--cyan); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.85rem; }
+  .var .txt { flex:1; }
+  .var.sel { border-color:var(--sel); background:rgba(30,221,102,.16); }
+  .var.sel .num { background:var(--sel); color:#04130a; }
+  .var.playing { outline:2px solid var(--cyan); }
+  .bar { position:fixed; left:0; right:0; bottom:0; background:rgba(8,12,22,.97); border-top:1px solid var(--line); padding:.7rem 1rem; display:flex; gap:.6rem; align-items:center; }
+  .bar button { flex:1; padding:.7rem; border-radius:.6rem; border:1.5px solid var(--line); background:rgba(0,229,255,.12); color:var(--text); font-weight:600; font-size:1rem; }
+  .bar .count { color:var(--muted); font-size:.9rem; flex:0 0 auto; }
+  #out { white-space:pre-wrap; background:#0a0f1c; border:1px solid var(--line); border-radius:.6rem; padding:.7rem; margin-top:.6rem; color:var(--gold); font-size:.9rem; display:none; }
+</style>
+</head>
+<body>
+  <h1>Aussprache-Test – Namen</h1>
+  <p class="intro">Tippe je Name die Varianten an und hör sie an. Tippe die, die am besten klingt – sie wird grün markiert. Unten „Ergebnis zeigen“ → lies mir die Liste vor (oder „Kopieren“).</p>
+  <div id="list"></div>
+
+  <div class="bar">
+    <span class="count" id="count">0/0</span>
+    <button id="showBtn">Ergebnis zeigen</button>
+    <button id="copyBtn">Kopieren</button>
+  </div>
+  <div id="out"></div>
+
+<script>
+const audio = new Audio();
+let playingEl = null;
+const choices = {}; // slug -> {name, num, text}
+let total = 0;
+
+function play(src, el) {
+  try { audio.pause(); } catch(e){}
+  if (playingEl) playingEl.classList.remove('playing');
+  audio.src = src; audio.currentTime = 0; audio.play().catch(()=>{});
+  playingEl = el; el.classList.add('playing');
+}
+function updateCount() {
+  document.getElementById('count').textContent = Object.keys(choices).length + '/' + total;
+}
+
+fetch('voice/aud/manifest.json').then(r => r.json()).then(players => {
+  total = players.length;
+  const list = document.getElementById('list');
+  players.forEach(p => {
+    const card = document.createElement('div'); card.className = 'card';
+    const head = document.createElement('div'); head.className = 'name';
+    head.innerHTML = '<span>' + p.name + '</span><span class="pick" id="pick_'+p.slug+'"></span>';
+    card.appendChild(head);
+    const vars = document.createElement('div'); vars.className = 'vars';
+    p.variants.forEach((v, idx) => {
+      const n = idx + 1;
+      const b = document.createElement('button'); b.className = 'var';
+      b.innerHTML = '<span class="num">'+n+'</span><span class="txt">'+v+'</span>';
+      b.addEventListener('click', () => {
+        play('voice/aud/'+p.slug+'_'+n+'.mp3', b);
+        vars.querySelectorAll('.var').forEach(x => x.classList.remove('sel'));
+        b.classList.add('sel');
+        choices[p.slug] = { name: p.name, num: n, text: v };
+        document.getElementById('pick_'+p.slug).textContent = '✓ ' + n + ' (' + v + ')';
+        updateCount();
+      });
+      vars.appendChild(b);
+    });
+    card.appendChild(vars);
+    list.appendChild(card);
+  });
+  updateCount();
+}).catch(e => {
+  document.getElementById('list').innerHTML = '<p style="color:#f88">manifest.json nicht gefunden – wurde generate_audition.py ausgeführt?</p>';
+});
+
+function resultText() {
+  return Object.values(choices).map(c => c.name + ': ' + c.num + ' (' + c.text + ')').join('\n');
+}
+document.getElementById('showBtn').addEventListener('click', () => {
+  const out = document.getElementById('out');
+  out.style.display = 'block';
+  out.textContent = Object.keys(choices).length ? resultText() : '(noch nichts ausgewählt)';
+  out.scrollIntoView({behavior:'smooth'});
+});
+document.getElementById('copyBtn').addEventListener('click', async () => {
+  const t = resultText();
+  try { await navigator.clipboard.writeText(t); document.getElementById('copyBtn').textContent = 'Kopiert ✓'; }
+  catch(e) { const out=document.getElementById('out'); out.style.display='block'; out.textContent=t; }
+});
+</script>
+</body>
+</html>

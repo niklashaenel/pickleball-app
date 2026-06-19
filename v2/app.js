@@ -1130,6 +1130,9 @@ function servingPlayerKey() {
   const s = slug(nm);
   return CLUB_SLUGS.has(s) ? ('name_' + s) : null;
 }
+// Spieler, für die es den vollen Blocksatz "Spielstand + Aufschlag <Name>" als EINEN Clip gibt
+// (dn_/dzn_-Dateien). Sonst wird der Name als eigener Schnipsel angehängt.
+const BLOCK_PLAYER_SLUGS = new Set(['inna', 'tobias', 'silas', 'matthias', 'yassine', 'christoph', 'petra', 'iris']);
 
 // Volle Ansage-Schnipsel bevorzugen (ganze Phrasen = natürliche Betonung)
 function buildPhraseKeys(event) {
@@ -1171,6 +1174,12 @@ function buildPhraseKeys(event) {
   if (settings.announceServer) {                  // "... Aufschlag <Name>"
     const sk = servingPlayerKey();
     if (!sk) return null;                          // unbekannter Name -> Wort-Fallback/Stimme
+    const sp = sk.replace('name_', '');
+    // Voller Blocksatz als EIN Clip im einfachen Fall (Doppel, normaler Punkt ohne
+    // Seitenwechsel-Vorspann/Verlängerung) -> klingt durchgehend statt 3-teilig.
+    if (settings.mode === 'doubles' && keys.length === 1 && BLOCK_PLAYER_SLUGS.has(sp)) {
+      return [(ziff ? 'dzn_' : 'dn_') + nums[0] + '_' + nums[1] + '_' + nums[2] + '_' + sp];
+    }
     keys.push('aufschlag', sk);
   }
   return keys;
