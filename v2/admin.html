@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Pickleball – Gruppen-Admin</title>
+<style>
+  :root { --bg:#05060d; --surface:#0f1626; --line:rgba(0,229,255,.25); --text:#eaf6ff; --muted:#8aa6c0; --cyan:#00e5ff; --gold:#fdff6a; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,sans-serif; padding:1rem 1rem 4rem; }
+  h1 { font-size:1.25rem; color:var(--cyan); margin:.2rem 0 .6rem; }
+  p.muted { color:var(--muted); font-size:.9rem; margin:.3rem 0; }
+  input[type=password], input[type=text] { background:#0a0f1c; color:var(--text); border:1.5px solid var(--line); border-radius:.6rem; padding:.6rem .7rem; font-size:1rem; width:100%; }
+  button { border:1.5px solid var(--line); border-radius:.6rem; background:rgba(0,229,255,.12); color:var(--text); font-weight:600; font-size:.95rem; padding:.55rem .9rem; cursor:pointer; }
+  button.danger { background:rgba(255,60,90,.16); color:#ff9bb0; border-color:rgba(255,60,90,.5); }
+  .row { display:flex; gap:.5rem; align-items:center; margin:.5rem 0; }
+  table { width:100%; border-collapse:collapse; margin-top:.8rem; }
+  th, td { text-align:left; padding:.55rem .5rem; border-bottom:1px solid var(--line); font-size:.92rem; vertical-align:middle; }
+  th { color:var(--cyan); font-size:.8rem; text-transform:uppercase; letter-spacing:.05em; }
+  td.code { font-family:monospace; color:var(--gold); }
+  .right { text-align:right; }
+  #msg { margin:.6rem 0; color:var(--gold); min-height:1.2rem; }
+  .hidden { display:none; }
+</style>
+</head>
+<body>
+  <h1>Gruppen-Admin</h1>
+
+  <div id="login">
+    <p class="muted">Master-Passwort eingeben (im Worker als <code>ADMIN_MASTER</code> hinterlegt).</p>
+    <div class="row">
+      <input type="password" id="key" placeholder="Master-Passwort" autocomplete="current-password" />
+      <button id="loginBtn">Anzeigen</button>
+    </div>
+  </div>
+
+  <div id="panel" class="hidden">
+    <div class="row">
+      <button id="refreshBtn">Aktualisieren</button>
+      <button id="logoutBtn">Abmelden</button>
+      <span class="muted" id="summary"></span>
+    </div>
+    <div id="msg"></div>
+    <table id="tbl">
+      <thead><tr><th>Name</th><th>Code</th><th>Erstellt</th><th class="right">Spiele</th><th></th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+
+<script>
+const WORKER_URL = 'https://pickleball.2v5dyky8dy.workers.dev';
+const KEY_STORE = 'pb-admin-master';
+const $ = (s) => document.querySelector(s);
+let masterKey = localStorage.getItem(KEY_STORE) || '';
+
+function setMsg(t) { $('#msg').textContent = t || ''; }
+function fmtDate(ms) { if (!ms) return '–'; const d = new Date(ms); return d.toLocaleDateString('de-DE') + ' ' + d.toLocaleTimeString('de-DE', {hour:'2-digit',minute:'2-digit'}); }
+
+async function loadGroups() {
+  setMsg('Lade …');
+  try {
+    const r = await fetch(WORKER_URL + '/api/admin/groups', { headers: { 'X-Admin-Master': masterKey } });
+    if (r.status === 403) { setMsg('Falsches Passwort oder Admin nicht eingerichtet.'); showLogin(); return; }
+    if (!r.ok) { setMsg('Fehler beim Laden.'); return; }
+    const d = await r.json();
+    const groups = d.groups || [];
+    const totalGames = groups.reduce((s, g) => s + (g.count || 0), 0);
+    $('#summary').textContent = groups.length + ' Gruppen · ' + totalGames + ' Spiele';
+    $('#rows').innerHTML = groups.map((g) =>
+      '<tr><td>' + (g.name || '—') + '</td><td class="code">' + g.code + '</td><td>' + fmtDate(g.created) +
+      '</td><td class="right">' + (g.count || 0) + '</td>' +
+      '<td class="right"><button class="danger del" data-code="' + g.code + '" data-name="' + (g.name||'') + '">Löschen</button></td></tr>'
+    ).join('') || '<tr><td colspan="5" class="muted">Keine Gruppen.</td></tr>';
+    document.querySelectorAll('.del').forEach((b) => b.addEventListener('click', () => delGroup(b.dataset.code, b.dataset.name)));
+    setMsg('');
+  } catch (e) { setMsg('Netzwerkfehler.'); }
+}
+
+async function delGroup(code, name) {
+  if (!confirm('Gruppe „' + (name || code) + '" (' + code + ') endgültig löschen?')) return;
+  setMsg('Lösche ' + code + ' …');
+  try {
+    const r = await fetch(WORKER_URL + '/api/admin/group/' + encodeURIComponent(code), { method: 'DELETE', headers: { 'X-Admin-Master': masterKey } });
+    if (!r.ok) { setMsg('Löschen fehlgeschlagen.'); return; }
+    await loadGroups();
+  } catch (e) { setMsg('Netzwerkfehler.'); }
+}
+
+function showPanel() { $('#login').classList.add('hidden'); $('#panel').classList.remove('hidden'); }
+function showLogin() { $('#panel').classList.add('hidden'); $('#login').classList.remove('hidden'); }
+
+$('#loginBtn').addEventListener('click', () => {
+  masterKey = $('#key').value.trim();
+  if (!masterKey) return;
+  localStorage.setItem(KEY_STORE, masterKey);
+  showPanel(); loadGroups();
+});
+$('#key').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#loginBtn').click(); });
+$('#refreshBtn').addEventListener('click', loadGroups);
+$('#logoutBtn').addEventListener('click', () => { localStorage.removeItem(KEY_STORE); masterKey=''; $('#key').value=''; showLogin(); });
+
+if (masterKey) { showPanel(); loadGroups(); } else { showLogin(); }
+</script>
+</body>
+</html>

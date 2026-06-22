@@ -45,6 +45,36 @@ export default {
         return json({ code, adminKey, name });
       }
 
+      // ---- Admin-Übersicht (nur mit Master-Key env.ADMIN_MASTER) ----
+      const masterOk = env.ADMIN_MASTER && (req.headers.get('X-Admin-Master') || '') === env.ADMIN_MASTER;
+      if (parts.length >= 2 && parts[0] === 'api' && parts[1] === 'admin') {
+        if (!masterOk) return json({ error: 'forbidden' }, 403);
+        // GET /api/admin/groups -> Liste aller Gruppen
+        if (req.method === 'GET' && parts.length === 3 && parts[2] === 'groups') {
+          const groups = [];
+          let cursor;
+          do {
+            const list = await KV.list({ prefix: 'meta:', cursor });
+            for (const k of list.keys) {
+              const code = k.name.slice(5);
+              const meta = JSON.parse((await KV.get('meta:' + code)) || '{}');
+              const games = JSON.parse((await KV.get('games:' + code)) || '[]');
+              groups.push({ code, name: meta.name || '', created: meta.created || 0, count: games.length });
+            }
+            cursor = list.list_complete ? null : list.cursor;
+          } while (cursor);
+          groups.sort((a, b) => b.created - a.created);
+          return json({ groups });
+        }
+        // DELETE /api/admin/group/{code} -> beliebige Gruppe löschen
+        if (req.method === 'DELETE' && parts.length === 4 && parts[2] === 'group') {
+          await KV.delete('meta:' + parts[3]);
+          await KV.delete('games:' + parts[3]);
+          return json({ ok: true });
+        }
+        return json({ error: 'bad request' }, 400);
+      }
+
       // /api/group/{code}...
       if (parts.length >= 3 && parts[0] === 'api' && parts[1] === 'group') {
         const code = parts[2];

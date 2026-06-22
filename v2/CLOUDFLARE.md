@@ -38,6 +38,16 @@ die App ein.
   → liefert `{"code":"…","adminKey":"…","name":"Test"}`.
 - Lesen: `https://DEIN-WORKER.workers.dev/api/group/DEIN-CODE` im Browser öffnen.
 
+## Admin-Übersicht (alle Gruppen sehen/löschen)
+Optional: eine geschützte Seite `admin.html`, die alle Gruppen auflistet (Name, Code, Datum,
+Anzahl Spiele) mit Lösch-Knopf. Schutz über ein Master-Passwort, das du im Worker hinterlegst:
+1. Worker `pickleball` → **Settings → Variables and Secrets** → **Add** → Typ **Secret**.
+   - **Name:** `ADMIN_MASTER` · **Value:** ein langes, eigenes Passwort → **Save/Deploy**.
+2. Worker-Code aktuell halten (siehe unten) – die Endpunkte `GET /api/admin/groups` und
+   `DELETE /api/admin/group/{code}` (jeweils Header `X-Admin-Master`) sind in `worker/worker.js` enthalten.
+3. Aufruf: `…github.io/pickleball-app/v2/admin.html` → Master-Passwort eingeben.
+Ohne gesetztes `ADMIN_MASTER` ist die Admin-Schnittstelle **deaktiviert** (liefert 403).
+
 ## Worker später aktualisieren
 Wenn sich `worker/worker.js` ändert (neue Funktionen): im Worker **Edit code** → alten Code
 ersetzen → **Deploy**. KV-Binding bleibt erhalten, nichts geht verloren.
