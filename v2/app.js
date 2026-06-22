@@ -240,8 +240,29 @@ async function fetchOnlineMatches() {
   const g = activeGroupObj();
   try {
     const r = await fetch(apiBase() + '/api/group/' + g.code + '?t=' + Date.now(), { cache: 'no-store' });
+    if (r.status === 404) { removeDeadGroup(g, true); return; } // vom Ersteller gelöscht -> auto-entfernen
     if (r.ok) { const d = await r.json(); onlineMatches = Array.isArray(d.games) ? d.games : []; }
-  } catch (e) { /* offline */ }
+  } catch (e) { /* offline -> nichts entfernen */ }
+}
+// Eine nicht mehr existierende Online-Gruppe lokal entfernen (auf jedem Gerät).
+function removeDeadGroup(g, notify) {
+  if (!g) return;
+  settings.groups = settings.groups.filter((x) => x.id !== g.id);
+  if (settings.activeGroup === g.id) settings.activeGroup = 'local';
+  saveQueue(loadQueue().filter((it) => it.code !== g.code));
+  saveSettings(); onlineMatches = []; renderGroups();
+  const hd = document.querySelector('#historyDlg'); if (hd && hd.open) renderHistory();
+  if (notify) flash('Gruppe „' + g.name + '" wurde vom Ersteller gelöscht');
+}
+// Alle eigenen Online-Gruppen prüfen und gelöschte (404) automatisch entfernen.
+async function pruneDeletedGroups() {
+  if (!onlineReady()) return;
+  for (const g of settings.groups.filter((x) => x.scope === 'online' && x.code)) {
+    try {
+      const r = await fetch(apiBase() + '/api/group/' + encodeURIComponent(g.code) + '?t=' + Date.now(), { cache: 'no-store' });
+      if (r.status === 404) removeDeadGroup(g, false);
+    } catch (e) { /* offline -> nicht anfassen */ }
+  }
 }
 async function deleteOnlineGame(gid) {
   if (!isOnlineGroup() || !onlineReady()) return false;
@@ -1663,8 +1684,9 @@ function init() {
   renderGroups();
   fetchOnlineMatches();
   flushQueue();
+  pruneDeletedGroups(); // gelöschte Online-Gruppen automatisch aus der Liste werfen
   probeClips();
   render();
 }
-window.addEventListener('online', flushQueue);
+window.addEventListener('online', () => { flushQueue(); pruneDeletedGroups(); });
 init();
