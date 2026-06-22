@@ -281,6 +281,35 @@ async function joinOnlineGroup(code) {
   } catch (e) { flash('Code nicht gefunden'); }
 }
 
+// Lokale Gruppe online stellen: neue Online-Gruppe anlegen, alle Spiele dieser lokalen Gruppe
+// hochladen (gid dedupt), zur Online-Gruppe wechseln. Lokale Gruppe bleibt als Backup erhalten.
+async function convertGroupToOnline() {
+  const src = activeGroupObj();
+  if (!src || src.scope === 'online') { flash('Diese Gruppe ist bereits online'); return; }
+  const games = loadHistory().filter((m) => (m.group || 'local') === src.id);
+  flash('Stelle „' + src.name + '" online …');
+  try {
+    const r = await fetch(apiBase() + '/api/group', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: src.name || 'Gruppe' }) });
+    if (!r.ok) throw 0;
+    const d = await r.json();
+    // älteste zuerst hochladen, damit die neuesten oben landen; gid verhindert Doppelte
+    let up = 0;
+    for (const game of games.slice().reverse()) {
+      try {
+        const rr = await fetch(apiBase() + '/api/group/' + d.code + '/games', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ game }) });
+        if (rr.ok) up++;
+      } catch (e) { /* einzelnes Spiel übersprungen -> kann später erneut hoch */ }
+    }
+    const g = { id: 'g' + Date.now(), name: src.name, scope: 'online', code: d.code, adminKey: d.adminKey, role: 'owner', created: Date.now() };
+    settings.groups.push(g); settings.activeGroup = g.id; saveSettings();
+    await fetchOnlineMatches(); renderGroups();
+    const hd = document.querySelector('#historyDlg'); if (hd && hd.open) renderHistory();
+    flash('Online gestellt: „' + g.name + '" · Code ' + d.code + ' (' + up + '/' + games.length + ' Spiele)');
+  } catch (e) { flash('Online stellen fehlgeschlagen'); }
+}
+
 function matchKey(m) { return m.gid ? ('g:' + m.gid) : ((m.ts || '') + '|' + (m.names ? m.names.A + '/' + m.names.B : '')); }
 function inActiveGroup(m) { return viewAllGroups ? true : ((m.group || 'local') === (settings.activeGroup || 'local')); }
 function allMatches() {
@@ -299,13 +328,23 @@ function renderGroups() {
   const as = document.querySelector('#setAutoSave'); if (as) as.checked = !!settings.autoSave;
   const wb = document.querySelector('#setWorkerBase'); if (wb) wb.value = settings.workerBase || '';
   const info = document.querySelector('#groupInfo');
+  const g = activeGroupObj();
   if (info) {
-    const g = activeGroupObj();
     if (g && g.scope === 'online') {
       info.textContent = 'Online-Gruppe · Code zum Teilen: ' + g.code + (g.role === 'owner' ? ' (Ersteller)' : '');
     } else {
       info.textContent = 'Lokale Gruppe (nur auf diesem Gerät).';
     }
+  }
+  // "Online stellen"-Knopf nur bei lokaler aktiver Gruppe zeigen (mit Spielanzahl)
+  const ob = document.querySelector('#groupOnlineBtn');
+  if (ob) {
+    const isLocal = g && g.scope !== 'online';
+    if (isLocal) {
+      const n = loadHistory().filter((m) => (m.group || 'local') === g.id).length;
+      ob.textContent = 'Diese Gruppe online stellen' + (n ? ' (' + n + ')' : '');
+    }
+    ob.style.display = isLocal ? '' : 'none';
   }
 }
 function computeStats() {
@@ -1514,6 +1553,7 @@ $('#delGroupBtn').addEventListener('click', () => {
   settings.groups = settings.groups.filter((g) => g.id !== settings.activeGroup);
   settings.activeGroup = 'local'; saveSettings(); renderGroups(); fetchOnlineMatches();
 });
+$('#groupOnlineBtn').addEventListener('click', convertGroupToOnline);
 
 // Statistik-Dialog
 $('#statsBtn').addEventListener('click', async () => { $('#viewAllStats').checked = viewAllGroups; renderStats(); $('#statsDlg').showModal(); await fetchOnlineMatches(); renderStats(); });
