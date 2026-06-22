@@ -58,6 +58,14 @@ export default {
           return json({ name: meta.name, games });
         }
 
+        // DELETE /api/group/{code}  -> ganze Gruppe löschen (nur Ersteller mit Admin-Key)
+        if (req.method === 'DELETE' && parts.length === 3) {
+          if ((req.headers.get('X-Admin-Key') || '') !== meta.adminKey) return json({ error: 'forbidden' }, 403);
+          await KV.delete('meta:' + code);
+          await KV.delete('games:' + code);
+          return json({ ok: true });
+        }
+
         // POST /api/group/{code}/games  -> ein Spiel anhängen
         if (req.method === 'POST' && parts.length === 4 && parts[3] === 'games') {
           const body = await req.json().catch(() => ({}));

@@ -252,6 +252,15 @@ async function deleteOnlineGame(gid) {
     return r.ok;
   } catch (e) { return false; }
 }
+// Ganze Online-Gruppe serverseitig löschen (nur Ersteller, der den adminKey hat).
+async function deleteOnlineGroupServer(g) {
+  if (!g || g.scope !== 'online' || !g.adminKey) return false;
+  try {
+    const r = await fetch(apiBase() + '/api/group/' + encodeURIComponent(g.code),
+      { method: 'DELETE', headers: { 'X-Admin-Key': g.adminKey } });
+    return r.ok;
+  } catch (e) { return false; }
+}
 async function createOnlineGroup(name) {
   if (!onlineReady()) { flash('Erst Worker-URL in den Einstellungen eintragen'); return; }
   try {
@@ -346,6 +355,9 @@ function renderGroups() {
     }
     ob.style.display = isLocal ? '' : 'none';
   }
+  // "Endgültig löschen" nur dem Ersteller einer Online-Gruppe zeigen (hat adminKey)
+  const db = document.querySelector('#delGroupServerBtn');
+  if (db) db.style.display = (g && g.scope === 'online' && g.role === 'owner' && g.adminKey) ? '' : 'none';
 }
 function computeStats() {
   const stats = {};
@@ -1554,6 +1566,20 @@ $('#delGroupBtn').addEventListener('click', () => {
   settings.activeGroup = 'local'; saveSettings(); renderGroups(); fetchOnlineMatches();
 });
 $('#groupOnlineBtn').addEventListener('click', convertGroupToOnline);
+$('#delGroupServerBtn').addEventListener('click', async () => {
+  const g = activeGroupObj();
+  if (!g || g.scope !== 'online' || g.role !== 'owner' || !g.adminKey) return;
+  if (!window.confirm('Gruppe „' + g.name + '" wirklich für ALLE endgültig löschen?\nDas kann nicht rückgängig gemacht werden.')) return;
+  const ok = await deleteOnlineGroupServer(g);
+  if (!ok) { flash('Löschen fehlgeschlagen (Worker aktualisiert?)'); return; }
+  // aus eigener Liste + Warteschlange entfernen, zurück auf Lokal
+  settings.groups = settings.groups.filter((x) => x.id !== g.id);
+  settings.activeGroup = 'local';
+  saveQueue(loadQueue().filter((it) => it.code !== g.code));
+  saveSettings(); onlineMatches = []; renderGroups();
+  const hd = document.querySelector('#historyDlg'); if (hd && hd.open) renderHistory();
+  flash('Gruppe „' + g.name + '" endgültig gelöscht');
+});
 
 // Statistik-Dialog
 $('#statsBtn').addEventListener('click', async () => { $('#viewAllStats').checked = viewAllGroups; renderStats(); $('#statsDlg').showModal(); await fetchOnlineMatches(); renderStats(); });
