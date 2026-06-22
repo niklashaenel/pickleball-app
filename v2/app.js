@@ -26,6 +26,7 @@ const DEFAULT_SETTINGS = {
   volume: 'laut',       // Lautstärke der Ansagen/Töne: 'normal' | 'laut' | 'sehr-laut' | 'maximal'
   callStyle: 'natur',   // Ansage-Stil: 'natur' ("eins zu eins, zwei") | 'ziffern' ("null null eins")
   announceServer: false,// bei jedem Punkt zusätzlich "Aufschlag <Name>" ansagen
+  scoreOnly: false,     // nur den aktuellen Stand ansagen (ohne Name/Seitenwechsel/Verlängerung)
   naturalVoice: true,   // vorab erzeugte natürliche Audio-Schnipsel verwenden, wenn vorhanden
   ringControl: false,   // Bluetooth-Ring (Mausrad/Scroll)
   watchControl: false,  // Smartwatch über Media Session
@@ -809,6 +810,9 @@ async function announce(event, force) {
       phrases.push('Spiel');
       phrases.push(wName + ' ' + winnerVerb());
     }
+  } else if (settings.scoreOnly) {
+    // Nur der aktuelle Stand - ohne Seitenwechsel, Name, Verlängerung
+    phrases.push(scorePhrase());
   } else {
     if (event === 'sideout') {
       phrases.push('Seitenwechsel');
@@ -1055,7 +1059,7 @@ function buildClipKeys(event) {
       keys.push('spiel'); team(game.winner); keys.push(winnerVerb());
     }
   } else {
-    if (event === 'sideout') {
+    if (!settings.scoreOnly && event === 'sideout') {
       keys.push('seitenwechsel');
       if (settings.announceTeam) { keys.push('aufschlag'); team(game.serving); }
     }
@@ -1067,10 +1071,10 @@ function buildClipKeys(event) {
     }
     if (settings.mode === 'doubles') num(nums[2]);
     const a = game.scores.A, b = game.scores.B;
-    if (event === 'point' && settings.winBy2 && a === b && a >= settings.target - 1) {
+    if (!settings.scoreOnly && event === 'point' && settings.winBy2 && a === b && a >= settings.target - 1) {
       keys.push('verlaengerung'); keys.push('es-geht-bis'); num(a + 2);
     }
-    if (settings.announceServer) {                 // "... Aufschlag <Name>"
+    if (!settings.scoreOnly && settings.announceServer) { // "... Aufschlag <Name>"
       keys.push('aufschlag');
       const sk = servingPlayerKey();
       if (sk) keys.push(sk); else bad = true;      // unbekannter Name -> Geräte-Stimme
@@ -1152,6 +1156,7 @@ function buildPhraseKeys(event) {
   const call = settings.mode === 'doubles'
     ? (ziff ? 'dz_' : 'd_') + nums[0] + '_' + nums[1] + '_' + nums[2]
     : (ziff ? 'sz_' : 's_') + nums[0] + '_' + nums[1];
+  if (settings.scoreOnly) return [call]; // Nur Spielstand - kein Seitenwechsel/Name/Verlängerung
   const keys = [];
   if (event === 'sideout' && settings.announceTeam) {
     const nm = teamName(game.serving);
@@ -1449,6 +1454,7 @@ function openSettings() {
   $('#setAnnounce').checked = settings.announce;
   $('#setCallStyle').value = settings.callStyle || 'natur';
   $('#setAnnounceServer').checked = settings.announceServer;
+  $('#setScoreOnly').checked = settings.scoreOnly;
   $('#setSound').checked = settings.sound;
   $('#setVolume').value = settings.volume || 'laut';
   $('#setWatch').checked = settings.watchControl;
@@ -1477,6 +1483,7 @@ $('#setStartChooser').addEventListener('change', (e) => { settings.showStartChoo
 $('#setAlternateServe').addEventListener('change', (e) => { settings.alternateServe = e.target.checked; saveSettings(); });
 $('#setCallStyle').addEventListener('change', (e) => { settings.callStyle = e.target.value; saveSettings(); });
 $('#setAnnounceServer').addEventListener('change', (e) => { settings.announceServer = e.target.checked; saveSettings(); });
+$('#setScoreOnly').addEventListener('change', (e) => { settings.scoreOnly = e.target.checked; saveSettings(); });
 $('#coinTossBtn').addEventListener('click', coinToss);
 $('#historyBtn').addEventListener('click', async () => {
   $('#viewAllHist').checked = viewAllGroups; renderHistory(); document.querySelector('#historyDlg').showModal();
