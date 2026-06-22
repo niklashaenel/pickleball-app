@@ -722,6 +722,7 @@ function renderHistory() {
 }
 async function deleteGame(gid, src) {
   if (!gid) return;
+  if (!window.confirm('Dieses Spiel wirklich löschen?\nDas kann nicht rückgängig gemacht werden.')) return;
   if (src === 'online') {
     const ok = await deleteOnlineGame(gid);
     if (!ok) { flash('Nur eigene Spiele oder als Ersteller löschbar'); return; }
