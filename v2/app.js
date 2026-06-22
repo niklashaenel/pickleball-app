@@ -171,6 +171,7 @@ function addHistory(entry) {
   entry.group = settings.activeGroup || 'local';
   entry.names = { A: teamName('A'), B: teamName('B') };
   entry.players = { A: parsePlayers(teamName('A')), B: parsePlayers(teamName('B')) };
+  entry.by = entry.by || memberId();   // wer das Spiel eingetragen hat (für "eigene löschen")
   let h = loadHistory();
   h.unshift(entry);
   if (h.length > 200) h = h.slice(0, 200);
@@ -215,14 +216,28 @@ function onlineReady() { return !!apiBase(); }
 function loadQueue() { try { return JSON.parse(localStorage.getItem(KEY_QUEUE)) || []; } catch (e) { return []; } }
 function saveQueue(q) { localStorage.setItem(KEY_QUEUE, JSON.stringify(q)); }
 
+// Stabile Geräte-/Mitglieds-ID (für "nur eigene Spiele löschen"). Kein Geheimnis, nur eine Marke.
+function memberId() {
+  let id = localStorage.getItem('pb-member-id');
+  if (!id) { id = 'm' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36); localStorage.setItem('pb-member-id', id); }
+  return id;
+}
+// gids, die DIESES Gerät online beigesteuert hat (für die Lösch-Sichtbarkeit im Verlauf).
+const KEY_MYGIDS = 'pb-my-online-gids';
+function loadMyGids() { try { return new Set(JSON.parse(localStorage.getItem(KEY_MYGIDS)) || []); } catch (e) { return new Set(); } }
+function rememberMyGid(gid) { if (!gid) return; const s = loadMyGids(); s.add(String(gid)); localStorage.setItem(KEY_MYGIDS, JSON.stringify([...s].slice(-2000))); }
+function isMyGid(gid) { return loadMyGids().has(String(gid)); }
+
 // Ein Spiel an die aktive Online-Gruppe anhängen; bei Fehler/offline in die Warteschlange.
 async function saveOnline(entry) {
   if (!isOnlineGroup() || !onlineReady()) return;
   const g = activeGroupObj();
+  if (!entry.by) entry.by = memberId();
   try {
     const r = await fetch(apiBase() + '/api/group/' + g.code + '/games', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ game: entry }) });
     if (!r.ok) throw 0;
+    rememberMyGid(entry.gid);
   } catch (e) { const q = loadQueue(); q.push({ code: g.code, game: entry }); saveQueue(q); }
 }
 // Warteschlange abarbeiten (beim Start + wenn wieder online)
@@ -235,6 +250,7 @@ async function flushQueue() {
       const r = await fetch(apiBase() + '/api/group/' + it.code + '/games', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ game: it.game }) });
       if (!r.ok) throw 0;
+      rememberMyGid(it.game && it.game.gid);
     } catch (e) { rest.push(it); }
   }
   saveQueue(rest);
@@ -274,7 +290,7 @@ async function deleteOnlineGame(gid) {
   const g = activeGroupObj();
   try {
     const r = await fetch(apiBase() + '/api/group/' + g.code + '/games/' + encodeURIComponent(gid),
-      { method: 'DELETE', headers: { 'X-Admin-Key': g.adminKey || '' } });
+      { method: 'DELETE', headers: { 'X-Admin-Key': g.adminKey || '', 'X-Member-Id': memberId() } });
     return r.ok;
   } catch (e) { return false; }
 }
@@ -331,10 +347,11 @@ async function convertGroupToOnline() {
     // älteste zuerst hochladen, damit die neuesten oben landen; gid verhindert Doppelte
     let up = 0;
     for (const game of games.slice().reverse()) {
+      if (!game.by) game.by = memberId();
       try {
         const rr = await fetch(apiBase() + '/api/group/' + d.code + '/games', {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ game }) });
-        if (rr.ok) up++;
+        if (rr.ok) { up++; rememberMyGid(game.gid); }
       } catch (e) { /* einzelnes Spiel übersprungen -> kann später erneut hoch */ }
     }
     const g = { id: 'g' + Date.now(), name: src.name, scope: 'online', code: d.code, adminKey: d.adminKey, role: 'owner', created: Date.now() };
@@ -682,6 +699,8 @@ function renderHistory() {
   const localKeys = new Set(loadHistory().map(matchKey));
   const list = allMatches();
   if (!list.length) { el.innerHTML = '<p class="muted">Noch keine Spiele gespeichert.</p>'; return; }
+  const ag = activeGroupObj();
+  const isOwner = !!(ag && ag.scope === 'online' && ag.role === 'owner');
   el.innerHTML = list.map((e) => {
     const d = new Date(e.ts);
     const date = d.toLocaleDateString('de-DE') + ' ' + d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
@@ -690,8 +709,11 @@ function renderHistory() {
     const teams = e.names ? (e.names.A + ' vs ' + e.names.B) : '';
     const src = localKeys.has(matchKey(e)) ? 'local' : 'online';
     const id = e.gid || e.ts || '';
-    return '<div class="hist-row"><button class="hist-del" data-gid="' + id + '" data-src="' + src +
-           '" title="Spiel löschen" aria-label="Spiel löschen">✕</button>' +
+    // Lokal: immer löschbar. Online: nur Ersteller ODER wer das Spiel selbst eingetragen hat.
+    const canDel = (src === 'local') || isOwner || isMyGid(id);
+    const delBtn = canDel ? ('<button class="hist-del" data-gid="' + id + '" data-src="' + src +
+           '" title="Spiel löschen" aria-label="Spiel löschen">✕</button>') : '<span class="hist-del-spacer"></span>';
+    return '<div class="hist-row">' + delBtn +
            '<span class="hist-date">' + date + (src === 'online' ? ' · ☁' : '') + '</span>' +
            '<span class="hist-teams">' + teams + '</span>' +
            '<span class="hist-res">' + res + ' · 🏆 ' + w + '</span></div>';
@@ -702,7 +724,7 @@ async function deleteGame(gid, src) {
   if (!gid) return;
   if (src === 'online') {
     const ok = await deleteOnlineGame(gid);
-    if (!ok) { flash('Online löschen nur als Ersteller der Gruppe'); return; }
+    if (!ok) { flash('Nur eigene Spiele oder als Ersteller löschbar'); return; }
     await fetchOnlineMatches();
   } else {
     const h = loadHistory().filter((m) => String(m.gid || m.ts) !== String(gid));

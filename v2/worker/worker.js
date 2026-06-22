@@ -5,7 +5,7 @@
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, X-Admin-Key, X-Admin-Master',
+  'Access-Control-Allow-Headers': 'Content-Type, X-Admin-Key, X-Admin-Master, X-Member-Id',
 };
 
 function json(data, status = 200) {
@@ -82,10 +82,12 @@ export default {
         if (!metaRaw) return json({ error: 'not found' }, 404);
         const meta = JSON.parse(metaRaw);
 
-        // GET /api/group/{code}  -> Name + Spiele (adminKey wird NIE zurückgegeben)
+        // GET /api/group/{code}  -> Name + Spiele (adminKey + internes "by" werden NIE zurückgegeben,
+        // damit niemand fremde Mitglieds-IDs auslesen und so fremde Spiele löschen kann)
         if (req.method === 'GET' && parts.length === 3) {
           const games = JSON.parse((await KV.get('games:' + code)) || '[]');
-          return json({ name: meta.name, games });
+          const safe = games.map((g) => { const { by, ...rest } = g; return rest; });
+          return json({ name: meta.name, games: safe });
         }
 
         // DELETE /api/group/{code}  -> ganze Gruppe löschen (nur Ersteller mit Admin-Key)
@@ -111,11 +113,17 @@ export default {
           return json({ ok: true, count: games.length });
         }
 
-        // DELETE /api/group/{code}/games/{gid}  -> ein Spiel löschen (jeder mit dem Code,
-        // genau wie Hinzufügen: Code = gemeinsamer Schreibzugriff der Gruppe)
+        // DELETE /api/group/{code}/games/{gid}  -> ein Spiel löschen.
+        // Erlaubt für: Ersteller (X-Admin-Key) ODER wer das Spiel selbst eingetragen hat
+        // (game.by === X-Member-Id). Sonst 403.
         if (req.method === 'DELETE' && parts.length === 5 && parts[3] === 'games') {
           const gid = decodeURIComponent(parts[4]);
           let games = JSON.parse((await KV.get('games:' + code)) || '[]');
+          const target = games.find((g) => String(g.gid) === String(gid));
+          if (!target) return json({ ok: true, count: games.length }); // schon weg
+          const isOwner = (req.headers.get('X-Admin-Key') || '') === meta.adminKey;
+          const isMine = !!target.by && target.by === (req.headers.get('X-Member-Id') || '');
+          if (!isOwner && !isMine) return json({ error: 'forbidden' }, 403);
           games = games.filter((g) => String(g.gid) !== String(gid));
           await KV.put('games:' + code, JSON.stringify(games));
           return json({ ok: true, count: games.length });
