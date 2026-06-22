@@ -42,7 +42,7 @@ const DEFAULT_SETTINGS = {
   groups: [{ id: 'local', name: 'Lokal', scope: 'local' }], // Speicher-Gruppen
   activeGroup: 'local',   // Spiele landen in dieser Gruppe
   autoSave: true,         // beendete Spiele automatisch speichern
-  workerBase: '',         // URL des eigenen Cloudflare-Workers (leer = Online aus)
+  workerBase: '',         // leer = fest hinterlegten WORKER_URL nutzen (Override nur via localStorage)
   names: { A: 'Team A', B: 'Team B' },
   roster: { A: [], B: [] } // geordnete Spieler je Team (Spieler 1 startet rechts) - für Aufschläger-Name
 };
@@ -199,7 +199,11 @@ let onlineMatches = [];     // Spiele der aktiven Online-Gruppe (vom Worker gela
 let viewAllGroups = false;  // Verlauf/Statistik: nur aktive Gruppe oder alle (lokal)
 
 // ---- Gruppen-Helfer ----
-function apiBase() { return (settings.workerBase || '').trim().replace(/\/+$/, ''); }
+// Fest hinterlegter Online-Speicher (eigener Cloudflare-Worker). Online funktioniert dadurch
+// out-of-the-box - kein Einrichten nötig. settings.workerBase (per localStorage) gewinnt weiterhin
+// als verstecktes Ausweichventil (z. B. für einen URL-Umzug), ist aber nicht mehr per UI setzbar.
+const WORKER_URL = 'https://pickleball.2v5dyky8dy.workers.dev';
+function apiBase() { return ((settings.workerBase || WORKER_URL).trim()).replace(/\/+$/, ''); }
 function activeGroupObj() { return (settings.groups || []).find((g) => g.id === settings.activeGroup) || settings.groups[0]; }
 function isOnlineGroup() { const g = activeGroupObj(); return !!(g && g.scope === 'online' && g.code); }
 function onlineReady() { return !!apiBase(); }
@@ -299,8 +303,6 @@ function renderGroups() {
     const g = activeGroupObj();
     if (g && g.scope === 'online') {
       info.textContent = 'Online-Gruppe · Code zum Teilen: ' + g.code + (g.role === 'owner' ? ' (Ersteller)' : '');
-    } else if (!onlineReady()) {
-      info.textContent = 'Lokale Gruppe. Für Online-Gruppen unten die Worker-URL eintragen.';
     } else {
       info.textContent = 'Lokale Gruppe (nur auf diesem Gerät).';
     }
@@ -1500,7 +1502,6 @@ $('#viewAllHist').addEventListener('change', (e) => { viewAllGroups = e.target.c
 $('#winnerSave').addEventListener('click', saveResult);
 $('#setActiveGroup').addEventListener('change', async (e) => { settings.activeGroup = e.target.value; saveSettings(); renderGroups(); await fetchOnlineMatches(); });
 $('#setAutoSave').addEventListener('change', (e) => { settings.autoSave = e.target.checked; saveSettings(); });
-$('#setWorkerBase').addEventListener('change', (e) => { settings.workerBase = (e.target.value || '').trim(); saveSettings(); renderGroups(); flushQueue(); });
 $('#newLocalGroup').addEventListener('click', () => {
   const n = ($('#newGroupName').value || '').trim(); if (!n) { flash('Name eingeben'); return; }
   const g = { id: 'g' + Date.now(), name: n, scope: 'local' };

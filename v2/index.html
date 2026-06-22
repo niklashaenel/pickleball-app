@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;900&family=Rajdhani:wght@500;600;700&family=Cinzel:wght@600;700&family=Playfair+Display:wght@600;700;900&family=Great+Vibes&family=Poppins:wght@400;500;600&family=Anton&family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=39" />
+  <link rel="stylesheet" href="styles.css?v=40" />
 </head>
 <body>
   <!-- Vollflächiger Farb-Blitz bei einem Punkt (aus Distanz sichtbar) -->
@@ -272,11 +272,7 @@
       <div class="btnrow">
         <button type="button" id="delGroupBtn" class="ghost small">Aktive Gruppe entfernen</button>
       </div>
-      <details class="setdetails">
-        <summary>Online einrichten (Worker-URL)</summary>
-        <p class="muted">Für Online-Gruppen brauchst du einen eigenen, kostenlosen Cloudflare-Worker. Anleitung: <code>CLOUDFLARE.md</code> im Projekt. Danach hier die Worker-URL eintragen.</p>
-        <input type="text" id="setWorkerBase" placeholder="https://dein-worker.workers.dev" style="width:100%" />
-      </details>
+      <p class="muted">Online-Gruppen sind sofort nutzbar – nichts einzurichten. „+ Online" legt eine geteilte Gruppe an; gib den <strong>Code</strong> weiter, andere tippen ihn bei „Beitreten" ein. „+ Lokal" bleibt nur auf diesem Gerät.</p>
       </details>
 
       <details class="setgroup">
@@ -352,6 +348,6 @@
   <!-- Stilles Loop-Audio für die Smartwatch-Mediensteuerung -->
   <audio id="silentAudio" src="silent.wav" loop preload="auto" playsinline></audio>
 
-  <script src="app.js?v=39"></script>
+  <script src="app.js?v=40"></script>
 </body>
 </html>
