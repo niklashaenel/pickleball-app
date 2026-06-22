@@ -190,8 +190,13 @@ function saveResult() {
 function updateWinnerSave() {
   const b = document.querySelector('#winnerSave');
   if (!b) return;
-  if (pendingResult) { b.textContent = 'Spiel speichern'; b.disabled = false; b.style.display = ''; }
-  else { b.style.display = 'none'; }
+  if (pendingResult) {            // noch nicht gespeichert -> Knopf zum manuellen Speichern
+    b.textContent = 'Spiel speichern'; b.disabled = false; b.style.display = '';
+  } else if (settings.autoSave && game.over) {  // automatisch gespeichert -> Bestätigung
+    b.textContent = '✓ Gespeichert'; b.disabled = true; b.style.display = '';
+  } else {
+    b.style.display = 'none';
+  }
 }
 
 // ---- #5a Statistik (Lesen) + Matchmaker + Export/Import ----

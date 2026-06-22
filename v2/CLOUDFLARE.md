@@ -55,9 +55,9 @@ ersetzen → **Deploy**. KV-Binding bleibt erhalten, nichts geht verloren.
 ## Vertrauensmodell (wichtig)
 - Der **Code** ist ein gemeinsames **Lese-/Schreib-Geheimnis** der Gruppe. Wer ihn hat, kann Spiele
   sehen und hinzufügen. Gib ihn nur an Leute, denen du vertraust.
-- **Löschen** einzelner Spiele **oder der ganzen Gruppe** kann nur der **Ersteller** (dessen App den
-  `adminKey` gespeichert hat). API: `DELETE /api/group/{code}/games/{gid}` bzw. `DELETE /api/group/{code}`,
-  jeweils mit Header `X-Admin-Key`.
+- **Einzelne Spiele** kann **jeder mit dem Code** hinzufügen **und löschen** (Code = gemeinsamer
+  Schreibzugriff). API: `POST` bzw. `DELETE /api/group/{code}/games/{gid}` (ohne Admin-Key).
+- Die **ganze Gruppe löschen** kann nur der **Ersteller** (`DELETE /api/group/{code}` mit `X-Admin-Key`).
 - Fremde **ohne** Code kommen nicht an die Gruppe; jede Gruppe ist isoliert.
 - Im App-Quellcode steht **kein** Geheimnis — nur die öffentliche Worker-URL.
 

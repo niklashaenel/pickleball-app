@@ -111,9 +111,9 @@ export default {
           return json({ ok: true, count: games.length });
         }
 
-        // DELETE /api/group/{code}/games/{gid}  -> ein Spiel löschen (nur Ersteller)
+        // DELETE /api/group/{code}/games/{gid}  -> ein Spiel löschen (jeder mit dem Code,
+        // genau wie Hinzufügen: Code = gemeinsamer Schreibzugriff der Gruppe)
         if (req.method === 'DELETE' && parts.length === 5 && parts[3] === 'games') {
-          if ((req.headers.get('X-Admin-Key') || '') !== meta.adminKey) return json({ error: 'forbidden' }, 403);
           const gid = decodeURIComponent(parts[4]);
           let games = JSON.parse((await KV.get('games:' + code)) || '[]');
           games = games.filter((g) => String(g.gid) !== String(gid));
