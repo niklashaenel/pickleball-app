@@ -1132,7 +1132,7 @@ function servingPlayerKey() {
 }
 // Spieler, für die es den vollen Blocksatz "Spielstand + Aufschlag <Name>" als EINEN Clip gibt
 // (dn_/dzn_-Dateien). Sonst wird der Name als eigener Schnipsel angehängt.
-const BLOCK_PLAYER_SLUGS = new Set(['inna', 'tobias', 'silas', 'matthias', 'yassine', 'christoph', 'petra', 'iris']);
+const BLOCK_PLAYER_SLUGS = new Set(['inna', 'tobias', 'silas', 'matthias', 'yassine', 'christoph', 'petra', 'iris', 'niki']);
 
 // Volle Ansage-Schnipsel bevorzugen (ganze Phrasen = natürliche Betonung)
 function buildPhraseKeys(event) {
