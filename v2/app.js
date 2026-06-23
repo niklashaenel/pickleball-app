@@ -1469,7 +1469,7 @@ function startMediaSession() {
   if (a) { try { a.volume = 0.03; if (a.paused) a.play().catch(() => {}); } catch (e) {} }
   if ('mediaSession' in navigator) {
     try {
-      if (window.MediaMetadata) navigator.mediaSession.metadata = new MediaMetadata({ title: 'Pickleball', artist: 'Punktezähler' });
+      if (window.MediaMetadata) navigator.mediaSession.metadata = new MediaMetadata({ title: 'PicklePoints', artist: 'Punktezähler' });
       navigator.mediaSession.setActionHandler('nexttrack', onMediaA);       // oben = A
       navigator.mediaSession.setActionHandler('previoustrack', onMediaB);   // unten = B
       navigator.mediaSession.setActionHandler('play', onMediaMiddle);       // Mitte = ansagen

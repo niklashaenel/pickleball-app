@@ -1,14 +1,36 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
-  <rect width="192" height="192" rx="36" fill="#0f172a"/>
-  <circle cx="96" cy="96" r="58" fill="#facc15"/>
-  <g fill="#0f172a">
-    <circle cx="96" cy="64" r="7"/>
-    <circle cx="74" cy="82" r="7"/>
-    <circle cx="118" cy="82" r="7"/>
-    <circle cx="84" cy="106" r="7"/>
-    <circle cx="108" cy="106" r="7"/>
-    <circle cx="96" cy="92" r="7"/>
-    <circle cx="74" cy="120" r="7"/>
-    <circle cx="118" cy="120" r="7"/>
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="36%" r="78%">
+      <stop offset="0%" stop-color="#243049"/>
+      <stop offset="68%" stop-color="#0c121f"/>
+      <stop offset="100%" stop-color="#070a12"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0.5" y2="1">
+      <stop offset="0%" stop-color="#fff8d8"/>
+      <stop offset="40%" stop-color="#f3cf63"/>
+      <stop offset="72%" stop-color="#d49f2c"/>
+      <stop offset="100%" stop-color="#9a6c15"/>
+    </linearGradient>
+    <radialGradient id="ball" cx="38%" cy="30%" r="82%">
+      <stop offset="0%" stop-color="#fff6bf"/>
+      <stop offset="45%" stop-color="#f9d24e"/>
+      <stop offset="100%" stop-color="#cf9620"/>
+    </radialGradient>
+  </defs>
+  <rect width="192" height="192" rx="44" fill="url(#bg)"/>
+  <rect x="14" y="14" width="164" height="164" rx="34" fill="none" stroke="url(#gold)" stroke-width="2.5" opacity="0.6"/>
+  <path d="M60 150 L60 142 C66 141 68 139 68 132 L68 58 C68 51 66 49 60 48 L60 42 L112 42 C136 42 150 56 150 76 C150 97 135 110 110 110 L88 110 L88 132 C88 139 90 141 98 142 L98 150 Z M88 54 L88 98 L106 98 C120 98 128 90 128 76 C128 62 120 54 106 54 Z" fill="url(#gold)" fill-rule="evenodd"/>
+  <path d="M64 50 L64 138" stroke="#fff3c0" stroke-width="2.5" opacity="0.45" stroke-linecap="round"/>
+  <circle cx="107" cy="76" r="15" fill="url(#ball)"/>
+  <circle cx="107" cy="76" r="15.5" fill="none" stroke="url(#gold)" stroke-width="1.6"/>
+  <ellipse cx="101" cy="69" rx="5.5" ry="3.4" fill="#fffdf0" opacity="0.6"/>
+  <g fill="#3a2a08">
+    <circle cx="107" cy="76" r="2.3"/>
+    <circle cx="115" cy="76" r="2.3"/>
+    <circle cx="111" cy="84" r="2.3"/>
+    <circle cx="103" cy="84" r="2.3"/>
+    <circle cx="99" cy="76" r="2.3"/>
+    <circle cx="103" cy="68" r="2.3"/>
+    <circle cx="111" cy="68" r="2.3"/>
   </g>
 </svg>

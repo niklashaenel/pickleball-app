@@ -1,7 +1,7 @@
 {
-  "name": "Pickleball Punktezähler",
-  "short_name": "Pickleball",
-  "description": "Punktezähler für Pickleball mit Sprachansage und Klicker-Steuerung",
+  "name": "PicklePoints",
+  "short_name": "PicklePoints",
+  "description": "PicklePoints – Punktezähler für Pickleball mit Sprachansage und Klicker-Steuerung",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",
@@ -9,6 +9,6 @@
   "background_color": "#0f172a",
   "theme_color": "#0f172a",
   "icons": [
-    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    { "src": "icon.svg?v=2", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
   ]
 }
