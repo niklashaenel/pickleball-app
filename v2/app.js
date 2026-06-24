@@ -1029,9 +1029,32 @@ function masterNode() {
   masterGain.gain.value = (g != null) ? g : 1.6;
   return masterGain;
 }
+// Hält den Audioausgang dauerhaft "wach" (durchgehender, unhörbarer Tiefton), damit BT-/Android-
+// Lautsprecher zwischen Ansagen nicht einschlafen und die ersten Zahlen verschlucken. Läuft direkt
+// an den Ausgang (unabhängig von der Lautstärke). Gibt true zurück, wenn er JETZT erst gestartet wurde.
+let keepAlive = null;
+function keepAudioWarm() {
+  const ctx = ensureAudio();
+  if (!ctx) return false;
+  if (keepAlive) return false;
+  try {
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = 'sine'; o.frequency.value = 32;   // Sub-Bass: praktisch unhörbar, aber "Signal" am Ausgang
+    g.gain.value = 0.0035;
+    o.connect(g); g.connect(ctx.destination);
+    o.start();
+    keepAlive = o;
+    return true;
+  } catch (e) { return false; }
+}
+function stopKeepAlive() { if (keepAlive) { try { keepAlive.stop(); } catch (e) {} keepAlive = null; } }
+// Im Hintergrund nicht weiterlaufen lassen (spart Akku/BT); beim nächsten Ton wird neu aufgewärmt.
+document.addEventListener('visibilitychange', () => { if (document.hidden) stopKeepAlive(); });
 function beep(freq, durMs, type, when) {
   const ctx = ensureAudio();
   if (!ctx) return;
+  keepAudioWarm();
   try {
     const o = ctx.createOscillator();
     const g = ctx.createGain();
@@ -1127,24 +1150,9 @@ function playEntries(entries) {
   if (!ctx) return;
   const valid = entries.filter(Boolean);
   if (!valid.length) return;
-  let t = ctx.currentTime + 0.08;
-  // Aufwärm-Vorlauf: ein kurzes, nahezu unhörbares Tonstück, damit der Audioausgang/BT-Lautsprecher
-  // schon "wach" ist. Manche Android-/Bluetooth-Geräte verschlucken sonst die ersten Zahlen, weil
-  // der Lautsprecher nach Stille ~0,3-0,5 s zum Aufwachen braucht.
-  try {
-    const warmDur = 0.38;
-    const len = Math.max(1, Math.ceil(ctx.sampleRate * warmDur));
-    const wbuf = ctx.createBuffer(1, len, ctx.sampleRate);
-    const wch = wbuf.getChannelData(0);
-    const inc = 2 * Math.PI * 55 / ctx.sampleRate; // tiefer 55-Hz-Ton (klein/unhörbar, aber "Signal")
-    for (let i = 0; i < len; i++) wch[i] = Math.sin(i * inc) * 0.012;
-    const wsrc = ctx.createBufferSource();
-    wsrc.buffer = wbuf;
-    wsrc.connect(masterNode() || ctx.destination);
-    wsrc.start(t);
-    clipNodes.push(wsrc);
-    t += warmDur;
-  } catch (e) {}
+  // Audioweg wach halten (gegen verschluckte erste Zahlen). cold = gerade erst gestartet -> einmal Vorlauf.
+  const cold = keepAudioWarm();
+  let t = ctx.currentTime + (cold ? 0.4 : 0.06); // Kaltstart: kurzer Vorlauf; sonst sofort (snappy)
   const GAP = 0.22; // natürliche Pause zwischen den Segmenten
   valid.forEach((en, idx) => {
     const isLast = idx === valid.length - 1;
