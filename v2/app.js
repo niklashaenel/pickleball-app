@@ -1126,7 +1126,25 @@ function playEntries(entries) {
   const ctx = ensureAudio();
   if (!ctx) return;
   const valid = entries.filter(Boolean);
-  let t = ctx.currentTime + 0.04;
+  if (!valid.length) return;
+  let t = ctx.currentTime + 0.08;
+  // Aufwärm-Vorlauf: ein kurzes, nahezu unhörbares Tonstück, damit der Audioausgang/BT-Lautsprecher
+  // schon "wach" ist. Manche Android-/Bluetooth-Geräte verschlucken sonst die ersten Zahlen, weil
+  // der Lautsprecher nach Stille ~0,3-0,5 s zum Aufwachen braucht.
+  try {
+    const warmDur = 0.38;
+    const len = Math.max(1, Math.ceil(ctx.sampleRate * warmDur));
+    const wbuf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const wch = wbuf.getChannelData(0);
+    const inc = 2 * Math.PI * 55 / ctx.sampleRate; // tiefer 55-Hz-Ton (klein/unhörbar, aber "Signal")
+    for (let i = 0; i < len; i++) wch[i] = Math.sin(i * inc) * 0.012;
+    const wsrc = ctx.createBufferSource();
+    wsrc.buffer = wbuf;
+    wsrc.connect(masterNode() || ctx.destination);
+    wsrc.start(t);
+    clipNodes.push(wsrc);
+    t += warmDur;
+  } catch (e) {}
   const GAP = 0.22; // natürliche Pause zwischen den Segmenten
   valid.forEach((en, idx) => {
     const isLast = idx === valid.length - 1;
