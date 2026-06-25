@@ -57,7 +57,11 @@
   <button id="mediaBtn" class="btn">▶︎ Uhr-Test: Mediensteuerung starten</button>
   <p class="hint">Danach auf der Uhr Weiter/Zurück/Play/Pause drücken – die Aktion erscheint im Log.</p>
 
-  <button class="clearbtn" id="clearBtn">Log leeren</button>
+  <div style="display:flex;gap:.6rem;flex-wrap:wrap;justify-content:center;align-items:center;">
+    <button class="btn" id="shareBtn" style="font-size:.95rem;padding:.55rem 1rem;">📤 Ergebnis teilen / kopieren</button>
+    <button class="clearbtn" id="clearBtn">Log leeren</button>
+  </div>
+  <p class="hint" id="shareHint">Tipp für Tester: ein paar Uhr-Tasten drücken, dann „Ergebnis teilen" – schick es an Stefan, dann können wir deine Uhr passend einstellen.</p>
   <div id="log"></div>
 
   <p class="hint">Legende: <span class="t-key">KEY</span> Taste ·
@@ -65,7 +69,13 @@
      <span class="t-touch">TOUCH</span> Finger · <span class="t-media">MEDIA</span> Uhr-Taste</p>
   <p class="hint">Tipp: Falls beim Ring nichts erscheint, hat er evtl. einen Umschalter
      (iOS/Android oder Kamera/Musik) – andere Stellung probieren.</p>
-  <p class="hint"><a href="index.html">← zur Punktezähler-App</a></p>
+  <details style="max-width:40rem;width:100%;text-align:left;">
+    <summary class="hint" style="cursor:pointer;">⌚ Wie aktiviere ich die Mediensteuerung auf meiner Uhr?</summary>
+    <p class="hint"><strong>Apple Watch:</strong> Auf dem iPhone diese Seite in Safari offen lassen + oben „Mediensteuerung starten". Auf der Uhr die App <strong>„Aktuelles" (Now Playing)</strong> öffnen – dort Play/Pause (Weiter/Zurück gibt iOS oft nicht weiter).</p>
+    <p class="hint"><strong>Garmin:</strong> Widget/Steuerungsmenü <strong>„Musiksteuerung"</strong> aktivieren (steuert das Handy). Dann Weiter/Zurück/Play drücken.</p>
+    <p class="hint"><strong>Android-Uhren (Wear OS, Redmi, Amazfit …):</strong> Die <strong>Mediensteuerung</strong>/„Musik"-Kachel der Uhr öffnen, sobald oben „Mediensteuerung läuft" steht.</p>
+  </details>
+  <p class="hint"><a href="index.html">← zurück zu PicklePoints</a></p>
 
   <script>
     const big = document.getElementById('big');
@@ -120,9 +130,9 @@
     function logMedia(name) { add('t-media', 'MEDIA', '⌚ ' + name, 'Aktion=<span>' + name + '</span>'); }
     mediaBtn.addEventListener('click', () => {
       if (!audioEl) {
-        audioEl = new Audio('silent.wav');
+        audioEl = new Audio('silent.wav?v=2');
         audioEl.loop = true;
-        audioEl.volume = 0.03;
+        audioEl.volume = 0.05;
         audioEl.setAttribute('playsinline', '');
       }
       audioEl.play().then(() => {
@@ -131,7 +141,7 @@
         mediaBtn.textContent = '⏹ Mediensteuerung läuft – jetzt Uhr-Tasten drücken';
         if ('mediaSession' in navigator) {
           try {
-            if (window.MediaMetadata) navigator.mediaSession.metadata = new MediaMetadata({ title: 'Pickleball Diagnose', artist: 'Uhr-Test' });
+            if (window.MediaMetadata) navigator.mediaSession.metadata = new MediaMetadata({ title: 'PicklePoints Diagnose', artist: 'Uhr-Test' });
             ['nexttrack','previoustrack','play','pause','seekforward','seekbackward','stop'].forEach((a) => {
               try { navigator.mediaSession.setActionHandler(a, () => logMedia(a)); } catch (e) {}
             });
@@ -144,6 +154,28 @@
       }).catch((err) => {
         add('t-media', 'MEDIA', 'Fehler', 'Audio-Start blockiert: ' + (err && err.message ? err.message : err));
       });
+    });
+
+    // --- Ergebnis teilen/kopieren (damit Tester ihr Uhr-Ergebnis schicken können) ---
+    function buildReport() {
+      const rows = [...log.querySelectorAll('div')].map((d) => d.textContent.replace(/\s+/g, ' ').trim());
+      rows.reverse(); // chronologisch (ältestes zuerst)
+      const head = ['PicklePoints – Uhr-/Eingabe-Diagnose', 'Geraet: ' + navigator.userAgent, 'Ereignisse: ' + rows.length, '----'];
+      return head.concat(rows.length ? rows : ['(noch nichts empfangen – erst Uhr-Tasten druecken)']).join('\n');
+    }
+    document.getElementById('shareBtn').addEventListener('click', async () => {
+      const text = buildReport();
+      const hint = document.getElementById('shareHint');
+      try { if (navigator.share) { await navigator.share({ title: 'PicklePoints Uhr-Diagnose', text }); return; } } catch (e) {}
+      try {
+        await navigator.clipboard.writeText(text);
+        hint.textContent = 'Kopiert! Jetzt in WhatsApp/Mail einfuegen und an Stefan schicken.';
+      } catch (e) {
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.style.cssText = 'width:100%;max-width:40rem;height:30vh;';
+        document.body.appendChild(ta); ta.focus(); ta.select();
+        hint.textContent = 'Markiere den Text unten, kopiere ihn und schick ihn an Stefan.';
+      }
     });
   </script>
 </body>
